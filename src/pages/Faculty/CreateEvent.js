@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Save, Send } from 'lucide-react';
+import { ArrowLeft, Save, Send, Calendar } from 'lucide-react';
 
 const CreateEvent = () => {
   const [currentStep, setCurrentStep] = useState(1);
