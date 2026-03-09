@@ -408,7 +408,7 @@ function SubEventModal({ isOpen, onClose, parentId, onSuccess, domains, initialD
                     })
                     .eq("id", initialData.id)
                     .eq("institution_id", profile.institution_id)
-                    .select("id", { count: 'exact' });
+                    .select("id");
 
                 if (error) throw error;
                 // Note: count check on update requires .select() or custom logic, 

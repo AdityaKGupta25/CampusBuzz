@@ -164,6 +164,7 @@ interface ResourceLink {
 
 interface EventData {
     id: string;
+    creator_id: string;
     title: string;
     description: string;
     rich_description: string;

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
     Plus, Building2, Trash2, Search,
-    RefreshCw, Loader2, X, AlertCircle, LayerSelect
+    RefreshCw, Loader2, X, AlertCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
