@@ -584,10 +584,7 @@ function EventManageDashboardInner() {
             return;
         }
 
-        if (rounds.length === 0 && !isStaffStudent) {
-            showMessage("Action Blocked: You must add at least one round (e.g., Registration) before final HOD submission.", "error");
-            return;
-        }
+        // Initialized publishing sequence
 
         setPublishing(true);
         setShowPublishConfirm(false);
