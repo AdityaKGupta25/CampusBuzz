@@ -122,21 +122,20 @@ function LiveBadge() {
 
 // ─── Ticket Card ──────────────────────────────────────────────────────────────
 
-function TicketCard({ ticket }: { ticket: MyTicket }) {
+function TicketCard({ ticket, isFlipped, onFlip }: { ticket: MyTicket; isFlipped: boolean; onFlip: () => void }) {
     const pal = paletteFor(ticket.id);
     const today = isToday(ticket.event.start_time);
     const isLiveEv = ticket.event.status === "live";
     const showLive = today || isLiveEv;
-    const [isFlipped, setIsFlipped] = useState(false);
 
     return (
-        <div className="relative mx-auto w-full max-w-[320px] h-[450px] group perspective-[1500px]">
+        <div className="relative mx-auto w-full max-w-[320px] h-[560px] group perspective-[1500px]">
             <motion.div
                 className="w-full h-full relative cursor-pointer"
                 style={{ transformStyle: "preserve-3d" }}
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
                 transition={{ duration: 0.6, type: "spring", bounce: 0.4 }}
-                onClick={() => setIsFlipped(!isFlipped)}
+                onClick={onFlip}
             >
                 {/* ── Front Face ── */}
                 <article
@@ -149,7 +148,7 @@ function TicketCard({ ticket }: { ticket: MyTicket }) {
                     }}
                 >
                     {/* ── Banner ── */}
-                    <div className="relative h-28 shrink-0 bg-white/5">
+                    <div className="relative h-24 shrink-0 bg-white/5">
                         <TicketBanner url={ticket.event.banner_url} title={ticket.event.title} accent={pal.accent} />
                         <div className="absolute inset-x-0 bottom-0 h-16" style={{ background: "linear-gradient(to bottom, transparent, #0d0d1a)" }} />
                         <div className="absolute top-0 inset-x-0 h-1.5" style={{ background: `linear-gradient(90deg, ${pal.accent}, ${pal.accent}44)` }} />
@@ -165,42 +164,44 @@ function TicketCard({ ticket }: { ticket: MyTicket }) {
                     </div>
 
                     {/* ── Body: Title & Details ── */}
-                    <div className="px-6 pt-1 pb-2 flex-1 flex flex-col justify-end">
-                        <h3 className="text-white font-extrabold text-xl leading-snug line-clamp-2">
+                    <div className="px-6 pt-6 pb-2 shrink-0">
+                        <h3 className="text-white font-extrabold text-xl leading-tight line-clamp-2">
                             {ticket.event.title}
                         </h3>
-                        <p className="text-white/40 text-[10px] font-bold tracking-widest uppercase mt-1">
+                        <p className="text-white/40 text-[10px] font-black tracking-widest uppercase mt-2">
                             {ticket.event.department?.name ?? "Campus Event"}
                         </p>
                     </div>
 
                     {/* ── Info ── */}
-                    <div className="px-6 py-2 space-y-3 shrink-0">
+                    <div className="px-6 py-4 space-y-3.5 shrink-0">
                         <InfoRow icon={Calendar} label="Date" value={fmtDate(ticket.event.start_time)} accent={pal.accent} />
                         <InfoRow icon={Clock} label="Time" value={`${fmtTime(ticket.event.start_time)} – ${fmtTime(ticket.event.end_time)}`} accent={pal.accent} />
                         <InfoRow icon={MapPin} label="Venue" value={ticket.event.venue?.name ?? "TBA"} accent={pal.accent} />
                     </div>
 
                     {/* ── Perforation divider (Punch-hole effect) ── */}
-                    <div className="relative flex items-center shrink-0 h-8 w-full overflow-hidden my-1">
+                    <div className="relative flex items-center shrink-0 h-10 w-full overflow-hidden my-2">
                         <div className="absolute -left-4 w-8 h-8 rounded-full bg-[#09090f]" style={{ border: `1px solid ${pal.border}` }} />
                         <div className="absolute -right-4 w-8 h-8 rounded-full bg-[#09090f]" style={{ border: `1px solid ${pal.border}` }} />
                         <div className="flex-1 mx-5 border-t-[2.5px] border-dashed" style={{ borderColor: `${pal.accent}40` }} />
                     </div>
 
                     {/* ── Lower section: QR Code ── */}
-                    <div className="px-6 pb-6 pt-2 flex flex-col items-center shrink-0">
-                        <div className="relative mb-4">
+                    <div className="px-6 flex-1 flex flex-col items-center justify-center relative pb-12">
+                        <div className="relative">
                             <div className="absolute inset-0 blur-2xl opacity-20" style={{ background: pal.accent }} />
-                            <div className="p-2.5 rounded-2xl relative bg-white" style={{ boxShadow: `0 0 0 4px ${pal.accent}15, 0 8px 30px ${pal.accent}25` }}>
-                                <QRCode value={ticket.id} size={110} bgColor="#ffffff" fgColor="#000000" style={{ display: "block" }} />
+                            <div className="p-3 rounded-2xl relative bg-white" style={{ boxShadow: `0 0 0 4px ${pal.accent}15, 0 8px 30px ${pal.accent}25` }}>
+                                <QRCode value={ticket.id} size={120} bgColor="#ffffff" fgColor="#000000" style={{ display: "block" }} />
                             </div>
                         </div>
-                        <div className="flex w-full items-center justify-between mt-auto">
-                            <p className="text-[10px] font-mono font-bold tracking-[0.25em]" style={{ color: `${pal.accent}90` }}>
+
+                        {/* Footer text pinned inside the card with balanced horizontal margins */}
+                        <div className="absolute bottom-8 left-8 right-8 flex items-center justify-between">
+                            <p className="text-[10px] font-mono font-black tracking-[0.25em]" style={{ color: `${pal.accent}90` }}>
                                 TKT-{ticket.id.slice(0, 6).toUpperCase()}
                             </p>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30 transition hover:text-white">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white/30">
                                 Tap to flip
                             </span>
                         </div>
@@ -311,9 +312,9 @@ function EmptyState() {
 
 function TicketSkeleton() {
     return (
-        <div className="rounded-[2rem] overflow-hidden animate-pulse w-full max-w-[320px] h-[450px] mx-auto flex flex-col"
+        <div className="rounded-[2rem] overflow-hidden animate-pulse w-full max-w-[320px] h-[560px] mx-auto flex flex-col"
             style={{ background: "#0d0d1a", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <div className="h-28 bg-white/5" />
+            <div className="h-24 bg-white/5" />
             <div className="p-6 space-y-4 pt-4">
                 <div className="h-6 bg-white/10 rounded-xl w-3/4 mb-6" />
                 <div className="space-y-4">
@@ -353,6 +354,7 @@ export default function MyTicketsPage() {
     const [tickets, setTickets] = useState<MyTicket[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [flippedTicketId, setFlippedTicketId] = useState<string | null>(null);
 
     async function loadTickets() {
         if (!authUser?.institution_id) return;
@@ -511,7 +513,12 @@ export default function MyTicketsPage() {
                                 [1, 2, 3].map((i) => <TicketSkeleton key={i} />)
                             ) : (
                                 tickets.map((ticket) => (
-                                    <TicketCard key={ticket.id} ticket={ticket} />
+                                    <TicketCard
+                                        key={ticket.id}
+                                        ticket={ticket}
+                                        isFlipped={flippedTicketId === ticket.id}
+                                        onFlip={() => setFlippedTicketId(flippedTicketId === ticket.id ? null : ticket.id)}
+                                    />
                                 ))
                             )}
                         </div>

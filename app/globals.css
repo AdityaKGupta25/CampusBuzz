@@ -43,12 +43,30 @@ html {
   border-radius: 4px;
 }
 
-.prose h1, .prose h2, .prose h3 {
+.prose h1,
+.prose h2,
+.prose h3 {
   color: white !important;
   font-weight: 900 !important;
   margin-bottom: 1rem;
 }
-.prose p { color: #a1a1aa !important; margin-bottom: 1rem; }
-.prose ul { padding-left: 1.25rem !important; margin-bottom: 1.5rem; }
-.prose ul li { color: #a1a1aa !important; margin-bottom: 0.5rem; }
-.prose strong { color: #818cf8 !important; font-weight: 900 !important; }
+
+.prose p {
+  color: #a1a1aa !important;
+  margin-bottom: 1rem;
+}
+
+.prose ul {
+  padding-left: 1.25rem !important;
+  margin-bottom: 1.5rem;
+}
+
+.prose ul li {
+  color: #a1a1aa !important;
+  margin-bottom: 0.5rem;
+}
+
+.prose strong {
+  color: #818cf8 !important;
+  font-weight: 900 !important;
+}
