@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     Calendar,
     Users,
@@ -383,15 +383,18 @@ function ParticipantRow({ p, idx }: { p: Participant; idx: number }) {
 function EventCard({
     event,
     onFinalize,
+    onArchive,
     institutionId,
     userRole
 }: {
     event: FacultyEvent;
     onFinalize: (event: FacultyEvent) => void;
+    onArchive?: (event: FacultyEvent) => Promise<void>;
     institutionId?: string;
     userRole?: string;
 }) {
     const router = useRouter();
+    const [archiving, setArchiving] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [participants, setParticipants] = useState<Participant[]>([]);
     const [loading, setLoading] = useState(false);
@@ -576,6 +579,23 @@ function EventCard({
                     >
                         <Award size={14} />
                         Close Event &amp; Issue Certificates
+                    </button>
+                )}
+
+                {/* Move to Archive — for completed or rejected events */}
+                {(event.status === "completed" || event.status === "rejected") && onArchive && (
+                    <button
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            setArchiving(true);
+                            await onArchive(event);
+                            setArchiving(false);
+                        }}
+                        disabled={archiving}
+                        className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white"
+                    >
+                        {archiving ? <Loader2 size={12} className="animate-spin" /> : <Box size={12} />}
+                        Move to Archive
                     </button>
                 )}
 
@@ -780,6 +800,7 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
 export default function FacultyMyEventsPage() {
     const { user } = useUser();
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const [events, setEvents] = useState<FacultyEvent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -806,6 +827,14 @@ export default function FacultyMyEventsPage() {
     }, []);
 
     // ── Finalize handler ──
+    // Handle URL params
+    useEffect(() => {
+        const archivedParam = searchParams.get("archived");
+        const isArchiveView = archivedParam === "true";
+        setShowArchived(isArchiveView);
+        setFilter("all");
+    }, [searchParams]);
+
     const handleFinalize = useCallback(async (): Promise<void> => {
         if (!modalEvent || !user?.institution_id) return;
         const eventId = modalEvent.id;
@@ -828,6 +857,25 @@ export default function FacultyMyEventsPage() {
             pushToast("error", err instanceof Error ? err.message : "Failed to finalize event.");
         }
     }, [modalEvent, user, pushToast]);
+
+    const handleMoveToArchive = useCallback(async (event: FacultyEvent) => {
+        if (!user?.institution_id) return;
+        try {
+            const { error } = await supabase
+                .from("events")
+                .update({ status: "archived" })
+                .eq("id", event.id)
+                .eq("institution_id", user.institution_id);
+
+            if (error) throw error;
+
+            // Remove from local state and show toast
+            setEvents(prev => prev.filter(e => e.id !== event.id));
+            pushToast("success", `"${event.title}" has been migrated to institutional archives.`);
+        } catch (err: any) {
+            pushToast("error", "Archival failed: " + err.message);
+        }
+    }, [user?.institution_id, pushToast]);
 
     const loadEvents = useCallback(async () => {
         if (!user?.dbId || !user?.institution_id) return;
@@ -955,7 +1003,10 @@ export default function FacultyMyEventsPage() {
 
                         <button
                             id="archive-toggle-btn"
-                            onClick={() => setShowArchived(!showArchived)}
+                            onClick={() => {
+                                setShowArchived(!showArchived);
+                                setFilter("all");
+                            }}
                             className={cn(
                                 "h-10 px-4 rounded-2xl flex items-center gap-2 transition-all text-[10px] font-black uppercase tracking-widest leading-none border",
                                 showArchived
@@ -1131,6 +1182,7 @@ export default function FacultyMyEventsPage() {
                         key={event.id}
                         event={event}
                         onFinalize={(ev) => setModalEvent(ev)}
+                        onArchive={handleMoveToArchive}
                         institutionId={user?.institution_id || ""}
                         userRole={user?.role}
                     />

@@ -71,6 +71,7 @@ import {
     Mic,
     Video,
     AlertTriangle,
+    Box,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -261,8 +262,9 @@ function EventManageDashboardInner() {
     const [checkingConflict, setCheckingConflict] = useState(false);
     const [venueAvailability, setVenueAvailability] = useState<VenueAvailability>({});
 
-    const isLocked = event?.status === "completed";
-    const isReadOnly = isLocked || (isStaffStudent && ['review_pending', 'pending', 'approved', 'live', 'completed'].includes(event?.status || ''));
+    const isArchived = event?.status === "archived";
+    const isLocked = event?.status === "completed" || isArchived;
+    const isReadOnly = isLocked || (isStaffStudent && ['review_pending', 'pending', 'approved', 'live', 'completed', 'archived'].includes(event?.status || ''));
 
     // Round Modal State
     const [isRoundModalOpen, setIsRoundModalOpen] = useState(false);
@@ -980,7 +982,7 @@ function EventManageDashboardInner() {
         try {
             const { error } = await supabase
                 .from("events")
-                .update({ is_archived: true })
+                .update({ status: 'archived' })
                 .eq("id", eventId)
                 .eq("institution_id", user?.institution_id || "");
             if (error) throw error;
@@ -1150,7 +1152,7 @@ function EventManageDashboardInner() {
                                 if (event?.parent_event_id) {
                                     router.push(`/faculty/event/${event.parent_event_id}/manage?tab=sub-events`);
                                 } else {
-                                    router.push("/faculty/my-events");
+                                    router.push(isArchived ? "/faculty/my-events?archived=true" : "/faculty/my-events");
                                 }
                             }}
                             className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-[0.2em] mb-12 group"
@@ -1413,8 +1415,26 @@ function EventManageDashboardInner() {
                 "flex-1 flex flex-col relative overflow-hidden",
                 isStaffStudent ? "mission-bg bg-zinc-950" : "bg-zinc-950"
             )}>
+                {/* Archived Lockdown Banner */}
+                {isArchived && (
+                    <div className="bg-rose-950/90 border-b border-rose-500/30 px-10 py-5 flex items-center justify-center gap-5 sticky top-0 z-[100] backdrop-blur-xl group overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-rose-500/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" />
+                        <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-500 relative shadow-2xl shadow-rose-500/20">
+                            <Box size={24} className="group-hover:rotate-12 transition-transform" />
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.4em] text-rose-500 flex items-center gap-2">
+                                <ShieldCheck size={12} /> Institutional Registry Archive
+                            </p>
+                            <p className="text-sm font-bold text-rose-100/90 mt-1 max-w-2xl leading-relaxed">
+                                🏛️ ARCHIVED RECORD: This event is locked for institutional audit and is in read-only mode. All governance data is now immutable.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Read-Only Indicator */}
-                {isReadOnly && (
+                {isReadOnly && !isArchived && (
                     <div className={cn(
                         "bg-amber-500/10 border-b border-amber-500/20 px-10 py-3 flex items-center justify-center gap-3 relative z-[60] overflow-hidden group",
                         isLocked && "bg-rose-500/10 border-rose-500/20"
@@ -1459,12 +1479,12 @@ function EventManageDashboardInner() {
                         </div>
 
                         <div className="flex items-center gap-6">
-                            <button
-                                onClick={() => setShowPreview(true)}
-                                className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-11 px-6 rounded-2xl transition-all border border-white/5 hover:bg-white/10 hover:border-white/10 backdrop-blur-md"
-                            >
-                                <Eye size={15} /> Preview
-                            </button>
+                                <button
+                                    onClick={() => setShowPreview(true)}
+                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-11 px-6 rounded-2xl transition-all border border-white/5 hover:bg-white/10 hover:border-white/10 backdrop-blur-md"
+                                >
+                                    <Eye size={15} /> Preview
+                                </button>
 
                             <button
                                 disabled={saving || isReadOnly || conflictStatus.type === 'HARD'}
@@ -1511,12 +1531,12 @@ function EventManageDashboardInner() {
                         </div>
 
                         <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => setShowPreview(true)}
-                                className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest h-10 px-4 rounded-xl transition-all border border-white/5 hover:bg-white/5"
-                            >
-                                <Eye size={16} /> Preview
-                            </button>
+                                <button
+                                    onClick={() => setShowPreview(true)}
+                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest h-10 px-4 rounded-xl transition-all border border-white/5 hover:bg-white/5"
+                                >
+                                    <Eye size={16} /> Preview
+                                </button>
                             <button
                                 disabled={saving || isReadOnly || conflictStatus.type === 'HARD'}
                                 onClick={handleSaveAll}
@@ -2466,17 +2486,19 @@ function RoundsTab({ rounds, onAdd, onEdit, onDelete, readOnly }: {
             )}
 
             {/* Big dashed Add Round button */}
-            <button
-                onClick={onAdd}
-                className="w-full h-24 border-2 border-dashed border-white/10 rounded-[2rem] flex items-center justify-center gap-4 text-zinc-500 hover:text-white hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group"
-            >
-                <div className="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-indigo-500/10 border border-white/10 group-hover:border-indigo-500/30 flex items-center justify-center transition-all">
-                    <Plus size={18} className="group-hover:text-indigo-400 transition-colors" />
-                </div>
-                <span className="text-xs font-black uppercase tracking-[0.2em]">
-                    {rounds.length === 0 ? "Add Your First Round" : "Add Round"}
-                </span>
-            </button>
+            {!readOnly && (
+                <button
+                    onClick={onAdd}
+                    className="w-full h-24 border-2 border-dashed border-white/10 rounded-[2rem] flex items-center justify-center gap-4 text-zinc-500 hover:text-white hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-indigo-500/10 border border-white/10 group-hover:border-indigo-500/30 flex items-center justify-center transition-all">
+                        <Plus size={18} className="group-hover:text-indigo-400 transition-colors" />
+                    </div>
+                    <span className="text-xs font-black uppercase tracking-[0.2em]">
+                        {rounds.length === 0 ? "Add Your First Round" : "Add Round"}
+                    </span>
+                </button>
+            )}
         </div>
     );
 }
@@ -2756,14 +2778,16 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
 }
 
 // ─── Toggle Switch ────────────────────────────────────────────────────────────
-function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (val: boolean) => void }) {
+function ToggleSwitch({ enabled, onChange, disabled }: { enabled: boolean; onChange: (val: boolean) => void; disabled?: boolean }) {
     return (
         <button
             type="button"
-            onClick={() => onChange(!enabled)}
+            disabled={disabled}
+            onClick={() => !disabled && onChange(!enabled)}
             className={cn(
-                "relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none shrink-0",
-                enabled ? "bg-indigo-500" : "bg-zinc-700"
+                "relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-200 focus:outline-none shrink-0",
+                enabled ? "bg-indigo-500" : "bg-zinc-700",
+                disabled && "opacity-50 cursor-not-allowed grayscale-[0.5]"
             )}
         >
             <span
@@ -2784,6 +2808,7 @@ function ToggleRow({
     enabled,
     onChange,
     children,
+    readOnly,
 }: {
     icon: React.ReactNode;
     label: string;
@@ -2791,6 +2816,7 @@ function ToggleRow({
     enabled: boolean;
     onChange: (val: boolean) => void;
     children?: React.ReactNode;
+    readOnly?: boolean;
 }) {
     return (
         <motion.div
@@ -2813,7 +2839,7 @@ function ToggleRow({
                         <p className="text-[10px] font-medium text-zinc-500 mt-0.5">{description}</p>
                     </div>
                 </div>
-                <ToggleSwitch enabled={enabled} onChange={onChange} />
+                <ToggleSwitch enabled={enabled} onChange={onChange} disabled={readOnly} />
             </div>
             {enabled && children && (
                 <motion.div
@@ -2910,6 +2936,7 @@ function RegistrationTab({
                     description="Ask students to upload a PDF resume during registration."
                     enabled={config.collect_resume}
                     onChange={(v) => update({ collect_resume: v })}
+                    readOnly={readOnly}
                 />
 
                 <ToggleRow
@@ -2918,6 +2945,7 @@ function RegistrationTab({
                     description="Require a link to the student\'s GitHub portfolio."
                     enabled={config.collect_github}
                     onChange={(v) => update({ collect_github: v })}
+                    readOnly={readOnly}
                 />
 
                 <ToggleRow
@@ -2926,6 +2954,7 @@ function RegistrationTab({
                     description="Require a link to the student's LinkedIn profile."
                     enabled={config.collect_linkedin}
                     onChange={(v) => update({ collect_linkedin: v })}
+                    readOnly={readOnly}
                 />
 
                 <ToggleRow
@@ -2934,6 +2963,7 @@ function RegistrationTab({
                     description="Allow or require students to register as a team."
                     enabled={config.team_participation}
                     onChange={(v) => update({ team_participation: v })}
+                    readOnly={readOnly}
                 >
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -3729,6 +3759,7 @@ function SettingsTab({
                                 <ToggleSwitch
                                     enabled={!!event.is_public}
                                     onChange={(val: boolean) => updateEvent({ is_public: val })}
+                                    disabled={readOnly}
                                 />
                             </div>
                         </div>
@@ -3836,32 +3867,34 @@ function SettingsTab({
             )}
 
             {/* Lifecycle Area */}
-            <div className="p-12 border-2 border-rose-500/10 rounded-[4rem] bg-rose-500/[0.02] flex items-center justify-between gap-10 overflow-hidden relative">
-                <div className="space-y-4 relative z-10">
-                    <div className="flex items-center gap-3 text-rose-500">
-                        <Trash2 size={18} />
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em]">Lifecycle Governance</span>
+            {event.status !== "archived" && (
+                <div className="p-12 border-2 border-rose-500/10 rounded-[4rem] bg-rose-500/[0.02] flex items-center justify-between gap-10 overflow-hidden relative">
+                    <div className="space-y-4 relative z-10">
+                        <div className="flex items-center gap-3 text-rose-500">
+                            <Trash2 size={18} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Lifecycle Governance</span>
+                        </div>
+                        <h4 className="text-2xl font-black text-rose-100 uppercase italic leading-none tracking-tighter">
+                            {readOnly ? "Archive Records" : "Permanent Deletion"}
+                        </h4>
+                        <p className="text-xs text-rose-500/50 font-medium max-w-sm leading-relaxed">
+                            {readOnly
+                                ? "Move this completed mission to the historical archives. Data will be preserved for institutional audit logs."
+                                : "Proceed with caution. Removing this entry will purge all associated rounds, prizes, and registrations from the ledger."
+                            }
+                        </p>
                     </div>
-                    <h4 className="text-2xl font-black text-rose-100 uppercase italic leading-none tracking-tighter">
-                        {readOnly ? "Archive Records" : "Permanent Deletion"}
-                    </h4>
-                    <p className="text-xs text-rose-500/50 font-medium max-w-sm leading-relaxed">
-                        {readOnly
-                            ? "Move this completed mission to the historical archives. Data will be preserved for institutional audit logs."
-                            : "Proceed with caution. Removing this entry will purge all associated rounds, prizes, and registrations from the ledger."
-                        }
-                    </p>
+                    <button
+                        onClick={onArchive}
+                        className="h-16 px-12 rounded-[2rem] border-2 border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-2xl shadow-rose-500/10 whitespace-nowrap z-10"
+                    >
+                        {readOnly ? "Move to Archive" : "Destroy Event Profile"}
+                    </button>
+                    <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500 -translate-y-1/2 translate-x-1/4 pointer-events-none">
+                        <Trash2 size={320} />
+                    </div>
                 </div>
-                <button
-                    onClick={onArchive}
-                    className="h-16 px-12 rounded-[2rem] border-2 border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-2xl shadow-rose-500/10 whitespace-nowrap z-10"
-                >
-                    {readOnly ? "Move to Archive" : "Destroy Event Profile"}
-                </button>
-                <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500 -translate-y-1/2 translate-x-1/4 pointer-events-none">
-                    <Trash2 size={320} />
-                </div>
-            </div>
+            )}
         </div>
     );
 }
