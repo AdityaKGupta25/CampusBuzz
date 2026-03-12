@@ -177,7 +177,7 @@ function getGreeting() {
 
 function Toast({ message }: { message: string }) {
     return (
-        <div className="fixed z-[200] left-1/2 -translate-x-1/2 bottom-24 flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold text-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300"
+        <div className="fixed z-[200] left-1/2 -translate-x-1/2 bottom-24 flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-bold text-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300"
             style={{ background: "linear-gradient(135deg,#059669,#065f46)", boxShadow: "0 0 40px rgba(5,150,105,0.35)" }}>
             <CheckCircle2 size={18} /> {message}
         </div>
@@ -212,7 +212,7 @@ function NotifDrawer({ open, onClose, notifications, loading }: {
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2.5">
                     {loading ? (
                         Array.from({ length: 4 }).map((_, i) => (
-                            <div key={i} className="h-16 rounded-2xl bg-white/5 animate-pulse" />
+                            <div key={i} className="h-16 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse" />
                         ))
                     ) : notifications.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-48 gap-3 text-zinc-700">
@@ -221,10 +221,10 @@ function NotifDrawer({ open, onClose, notifications, loading }: {
                         </div>
                     ) : notifications.map((n) => (
                         <div key={n.id}
-                            className={cn("rounded-2xl p-4 border transition-all",
+                            className={cn("rounded-xl p-4 border transition-all",
                                 !n.is_read
                                     ? "bg-indigo-500/8 border-indigo-500/20"
-                                    : "bg-white/[0.03] border-white/5"
+                                    : "bg-zinc-900 border-zinc-800"
                             )}>
                             <div className="flex items-start gap-3">
                                 <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
@@ -259,7 +259,7 @@ function FeaturedCard({ event, onRegister, registered, forceWide }: { event: Cam
         <div
             onClick={() => router.push(`/student/event/${event.id}`)}
             className={cn(
-                "w-full h-80 lg:h-96 relative rounded-[2.5rem] overflow-hidden group border border-white/5 active:scale-[0.98] transition-all cursor-pointer shadow-2xl mx-auto flex-shrink-0",
+                "w-full h-80 lg:h-96 relative rounded-xl overflow-hidden group border border-zinc-800 active:scale-[0.98] transition-all cursor-pointer shadow-2xl mx-auto flex-shrink-0",
                 forceWide ? "max-w-full" : "max-w-[calc(100vw-3rem)] lg:max-w-5xl"
             )}
         >
@@ -347,7 +347,7 @@ function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRe
 
     return (
         <div
-            className={cn("group relative flex flex-col rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1", "bg-zinc-950 border border-white/6 hover:border-white/12 hover:shadow-2xl hover:shadow-black/50")}
+            className={cn("group relative flex flex-col rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1", "bg-zinc-950 border border-zinc-800 hover:border-zinc-700 hover:shadow-2xl hover:shadow-black/50")}
             onClick={() => router.push(`/student/event/${event.id}`)}
         >
             {/* 16:9 Banner */}
@@ -455,15 +455,15 @@ function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRe
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
 function FeaturedSkel() {
-    return <div className="flex-shrink-0 rounded-3xl animate-pulse bg-white/5 w-[280px] lg:w-[420px]" style={{ aspectRatio: "16/9" }} />;
+    return <div className="flex-shrink-0 rounded-xl animate-pulse bg-zinc-900 border border-zinc-800 w-[280px] lg:w-[420px]" style={{ aspectRatio: "16/9" }} />;
 }
 function CardSkel() {
-    return <div className="rounded-3xl animate-pulse bg-white/5 border border-white/5 overflow-hidden">
-        <div className="w-full aspect-video bg-white/8" />
+    return <div className="rounded-xl animate-pulse bg-zinc-900 border border-zinc-800 overflow-hidden">
+        <div className="w-full aspect-video bg-zinc-800" />
         <div className="p-4 space-y-2">
-            <div className="h-3 bg-white/8 rounded-full w-1/2" />
-            <div className="h-4 bg-white/8 rounded-full w-3/4" />
-            <div className="h-8 bg-white/5 rounded-xl mt-4" />
+            <div className="h-3 bg-zinc-800 rounded-full w-1/2" />
+            <div className="h-4 bg-zinc-800 rounded-full w-3/4" />
+            <div className="h-8 bg-zinc-800 rounded-xl mt-4" />
         </div>
     </div>;
 }
@@ -475,8 +475,8 @@ function RegisterSheet({ event, onClose, onConfirm }: { event: CampusEvent; onCl
     return (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="w-full max-w-md rounded-t-[2rem] border-t border-white/10 shadow-2xl overflow-hidden" style={{ background: "#0d0d1e" }}>
-                <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-white/15" /></div>
+            <div className="w-full max-w-md rounded-t-xl border-t border-zinc-800 shadow-2xl overflow-hidden" style={{ background: "#09090b" }}>
+                <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-zinc-800" /></div>
 
                 <div className="mx-4 mt-3 mb-4 rounded-2xl overflow-hidden relative" style={{ aspectRatio: "16/9" }}>
                     {event.bannerUrl
@@ -496,17 +496,16 @@ function RegisterSheet({ event, onClose, onConfirm }: { event: CampusEvent; onCl
                         { icon: MapPin, label: "Venue", value: event.venue },
                         { icon: Users, label: "Seats Left", value: `${event.seatsLeft} / ${event.seats}` },
                     ].map(({ icon: Icon, label, value }) => (
-                        <div key={label} className="rounded-xl p-3 bg-white/4 border border-white/6">
-                            <div className="flex items-center gap-1.5 mb-1"><Icon size={11} className="text-white/30" /><span className="text-[10px] text-white/30 uppercase tracking-wide">{label}</span></div>
+                        <div key={label} className="rounded-xl p-3 bg-zinc-900 border border-zinc-800">
+                            <div className="flex items-center gap-1.5 mb-1"><Icon size={11} className="text-zinc-500" /><span className="text-[10px] text-zinc-500 uppercase tracking-wide">{label}</span></div>
                             <p className="text-white text-xs font-semibold">{value}</p>
                         </div>
                     ))}
                 </div>
                 <div className="grid grid-cols-2 gap-3 mx-4 my-4">
-                    <button onClick={onClose} className="h-12 rounded-2xl text-sm font-semibold border border-white/10 text-white/40">Cancel</button>
+                    <button onClick={onClose} className="h-12 rounded-xl text-sm font-semibold border border-zinc-800 text-zinc-500 hover:bg-zinc-900 transition-all">Cancel</button>
                     <button onClick={() => { onConfirm(event.id); onClose(); }}
-                        className="h-12 rounded-2xl text-white text-sm font-bold flex items-center justify-center gap-2"
-                        style={{ background: "#4f46e5", boxShadow: "0 8px 24px rgba(79,70,229,0.4)" }}>
+                        className="h-12 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20">
                         <CheckCircle2 size={16} /> Confirm
                     </button>
                 </div>
@@ -729,14 +728,14 @@ export default function StudentFeedPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 bg-white/5 border border-white/5 relative overflow-hidden group hover:border-indigo-500/30 transition-all cursor-help pulse-badge">
+                            <div className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 relative overflow-hidden group hover:border-indigo-500/30 transition-all cursor-help pulse-badge">
                                 <Star size={10} className="text-indigo-400 fill-indigo-400" />
                                 <span className="text-[10px] font-black text-zinc-300 tracking-tighter">
                                     {karmaPoints !== null ? `${karmaPoints} PT` : "—"}
                                 </span>
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shine_1.5s_ease-in-out_infinite]" />
                             </div>
-                            <button onClick={handleBellClick} className="relative p-2 rounded-xl bg-white/5 border border-white/5 text-zinc-400 hover:text-white transition-all">
+                            <button onClick={handleBellClick} className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-all">
                                 <Bell size={16} />
                                 {notifCount > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full" />}
                             </button>
@@ -754,17 +753,17 @@ export default function StudentFeedPage() {
                                 placeholder="Search..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-10 bg-white/5 border border-white/8 rounded-xl pl-10 pr-4 text-xs font-semibold placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/10 focus:border-white/20 transition-all"
+                                className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 text-xs font-semibold placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/10 focus:border-zinc-700 transition-all"
                             />
                         </div>
 
                         {/* iOS Style Segmented Control */}
-                        <div className="flex p-0.5 bg-white/5 rounded-xl border border-white/8 h-10 w-[140px] shrink-0">
+                        <div className="flex p-0.5 bg-zinc-950 rounded-xl border border-zinc-800 h-10 w-[140px] shrink-0">
                             <button
                                 onClick={() => setFeedFilter("campus")}
                                 className={cn(
                                     "flex-1 rounded-[10px] text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5",
-                                    feedFilter === "campus" ? "bg-white text-black shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                                    feedFilter === "campus" ? "bg-zinc-100 text-black shadow-lg" : "text-zinc-500 hover:text-zinc-300"
                                 )}
                             >
                                 <div className={cn("w-1 h-1 rounded-full", feedFilter === "campus" ? "bg-black" : "bg-emerald-500")} /> Campus
@@ -791,7 +790,7 @@ export default function StudentFeedPage() {
                                     className={cn("flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full border text-[9px] font-black uppercase tracking-[0.15em] transition-all",
                                         isActive
                                             ? "bg-white border-white text-black shadow-lg"
-                                            : "bg-white/5 border-white/5 text-zinc-500 hover:text-white"
+                                            : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-white"
                                     )}>
                                     {tab === 'live' && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
                                     {tab === 'past' ? 'Archives' : tab}

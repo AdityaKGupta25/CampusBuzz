@@ -483,7 +483,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                     <div className="absolute top-6 left-6 z-10">
                         <button
                             onClick={() => router.back()}
-                            className="flex items-center gap-2 text-zinc-400 hover:text-white transition-all text-xs font-bold uppercase tracking-widest bg-black/30 backdrop-blur-md border border-white/10 rounded-full px-4 py-2"
+                            className="flex items-center gap-2 text-zinc-400 hover:text-white transition-all text-xs font-bold uppercase tracking-widest bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2"
                         >
                             <ArrowLeft size={14} /> Back
                         </button>
@@ -492,7 +492,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                 {/* Preview Mode Sticky Header */}
                 {previewMode && (
-                    <div className="fixed top-0 left-0 right-0 z-[1000] bg-black/80 backdrop-blur-2xl border-b border-white/10 px-6 py-4 flex items-center justify-between">
+                    <div className="fixed top-0 left-0 right-0 z-[1000] bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
                                 <Eye size={18} />
@@ -533,11 +533,11 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                     ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                                     : event.status === "completed"
                                         ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
-                                        : "bg-white/5 border-white/10 text-zinc-400"
+                                        : "bg-zinc-900 border-zinc-800 text-zinc-400"
                             )}>
                                 {event.status === "completed" ? "Successfully Concluded" : (isComp ? "Active Competition" : "Official Event")}
                             </span>
-                            <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 bg-white/5 text-zinc-400 backdrop-blur-md">
+                            <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-zinc-800 bg-zinc-900 text-zinc-400 backdrop-blur-md">
                                 <Users size={10} className="inline mr-1.5" />{registered > 0 ? `${registered} attendees` : "Registration Open"}
                             </span>
                         </div>
@@ -550,19 +550,19 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                         <div className="flex flex-wrap items-center gap-4 pt-4">
                             {/* Parent Fest Badge */}
                             {event.parent_event_id && (
-                                <div className="flex items-center gap-2.5 bg-indigo-500/10 backdrop-blur-xl border border-indigo-500/20 rounded-2xl px-5 py-3">
+                                <div className="flex items-center gap-2.5 bg-indigo-500/10 backdrop-blur-xl border border-indigo-500/20 rounded-xl px-5 py-3">
                                     <Sparkles size={16} className="text-indigo-400" />
                                     <span className="text-sm font-black text-indigo-100 uppercase tracking-widest">Part of {event.club?.name || "The Fest"}</span>
                                 </div>
                             )}
 
                             {/* Points Badge */}
-                            <div className="flex items-center gap-2.5 bg-amber-500/10 backdrop-blur-xl border border-amber-500/20 rounded-2xl px-5 py-3">
+                            <div className="flex items-center gap-2.5 bg-amber-500/10 backdrop-blur-xl border border-amber-500/20 rounded-xl px-5 py-3">
                                 <Trophy size={16} className="text-amber-400" />
                                 <span className="text-sm font-black text-amber-100 uppercase tracking-widest">🏆 Earn 500 Karma Points</span>
                             </div>
 
-                            <div className="flex items-center gap-2.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-3 ml-auto hidden md:flex">
+                            <div className="flex items-center gap-2.5 bg-zinc-900 backdrop-blur-xl border border-zinc-800 rounded-xl px-5 py-3 ml-auto hidden md:flex">
                                 <Calendar size={16} className="text-zinc-500" />
                                 <span className="text-sm font-bold text-zinc-200">{fmtDateLong(event.start_time)}</span>
                             </div>
@@ -574,7 +574,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
             {/* ══════════════════════════════════════════════════════════════
                 Sticky Nav bar
             ══════════════════════════════════════════════════════════════ */}
-            <nav className={cn("sticky z-[100] w-full bg-[#09090b]/85 backdrop-blur-xl border-b border-white/5", previewMode ? "top-8" : "top-0")}>
+            <nav className={cn("sticky z-[100] w-full bg-[#09090b]/85 backdrop-blur-xl border-b border-zinc-800", previewMode ? "top-8" : "top-0")}>
                 <div className="w-full px-6 md:px-16 flex items-center justify-between h-14">
                     <div className="flex items-center gap-1">
                         {NAV_ITEMS.map(item => (
@@ -598,7 +598,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                     </div>
                     <div className="hidden md:flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
                         <span className="text-zinc-600">{registered} / {capacity} seats</span>
-                        <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="w-24 h-1.5 bg-zinc-900 rounded-full overflow-hidden">
                             <div className="h-full bg-gradient-to-r from-indigo-500 to-rose-500 rounded-full" style={{ width: `${fillPct}%` }} />
                         </div>
                     </div>
@@ -684,7 +684,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                                 onClick={() => window.location.href = `/student/event/${sub.id}`}
                                                                 className="min-w-[280px] md:min-w-[320px] group cursor-pointer snap-start"
                                                             >
-                                                                <div className="bg-zinc-950 border border-white/5 rounded-3xl p-6 min-h-[420px] hover:border-indigo-500/30 transition-all duration-500 relative overflow-hidden group flex flex-col justify-between shadow-2xl">
+                                                                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 min-h-[420px] hover:border-indigo-500/30 transition-all duration-500 relative overflow-hidden group flex flex-col justify-between shadow-2xl">
                                                                     {/* Banner Background with Glassmorphic Overlay */}
                                                                     {sub.banner_url ? (
                                                                         <>
@@ -703,10 +703,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                                                     <div className="space-y-6 relative z-10">
                                                                         <div className="flex items-center justify-between">
-                                                                            <span className="px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest border border-white/5">
+                                                                            <span className="px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest">
                                                                                 {fmtDateLong(sub.start_time)}
                                                                             </span>
-                                                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-300 bg-white/5 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/5">
+                                                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-300 bg-zinc-900 border border-zinc-800 backdrop-blur-md px-2.5 py-1.5 rounded-full">
                                                                                 <Users size={12} className="text-indigo-400" />
                                                                                 <span className="font-black">{sub.registered_count}</span>
                                                                             </div>
@@ -715,7 +715,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                                     </div>
 
                                                                     <div className="pt-6 relative z-10">
-                                                                        <div className="w-full h-12 rounded-xl bg-transparent border border-white/10 text-[9px] font-black uppercase tracking-widest text-center text-white/60 group-hover:text-white transition-all flex items-center justify-center gap-2 hover:bg-white/5 shadow-xl">
+                                                                        <div className="w-full h-12 rounded-xl bg-transparent border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-center text-zinc-500 group-hover:text-white transition-all flex items-center justify-center gap-2 hover:bg-zinc-800 shadow-xl">
                                                                             View Competition Track <ArrowRight size={12} className="opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                                                         </div>
                                                                     </div>
@@ -731,7 +731,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="py-24 text-center border-2 border-dashed border-white/5 rounded-[3.5rem] bg-white/[0.02] flex flex-col items-center gap-4">
+                                        <div className="py-24 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-950/50 flex flex-col items-center gap-4">
                                             <div className="w-16 h-16 rounded-[2rem] bg-zinc-900 flex items-center justify-center text-zinc-700">
                                                 <Layers size={24} />
                                             </div>
@@ -747,7 +747,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                 <div className="space-y-12">
                                     {/* Massive Total Pool */}
-                                    <div className="p-16 bg-gradient-to-br from-amber-500/10 via-transparent to-rose-500/10 border border-amber-500/20 rounded-[3.5rem] text-center relative overflow-hidden group">
+                                    <div className="p-16 bg-gradient-to-br from-amber-500/10 via-transparent to-rose-500/10 border border-amber-500/20 rounded-xl text-center relative overflow-hidden group">
                                         <div className="relative z-10 space-y-4">
                                             <p className="text-[10px] font-black text-amber-500 uppercase tracking-[0.5em]">Mega Prize Pool</p>
                                             <h3 className="text-7xl md:text-9xl font-black text-white tracking-tighter drop-shadow-[0_0_25px_rgba(245,158,11,0.3)]">
@@ -757,15 +757,15 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-amber-500" />)}
                                             </div>
                                         </div>
-                                        <div className="absolute inset-0 bg-white/[0.01] pointer-events-none" />
+                                        <div className="absolute inset-0 bg-zinc-950/20 pointer-events-none" />
                                     </div>
 
                                     {/* Perks Grid */}
                                     {prizes.length > 0 && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             {prizes.map((perk, i) => (
-                                                <div key={i} className="bg-zinc-900/50 border border-white/5 p-10 rounded-[2.5rem] flex items-start gap-8 hover:border-amber-500/30 transition-all group">
-                                                    <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-110 transition-transform">
+                                                <div key={i} className="bg-zinc-900 border border-zinc-800 p-10 rounded-xl flex items-start gap-8 hover:border-amber-500/30 transition-all group">
+                                                    <div className="w-16 h-16 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-110 transition-transform">
                                                         {perk.icon === "briefcase" ? <Briefcase size={28} /> :
                                                             perk.icon === "shirt" ? <Shirt size={28} /> :
                                                                 perk.icon === "gift" ? <Gift size={28} /> :
@@ -801,11 +801,11 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 <div key={tier} className="space-y-8">
                                                     <div className="flex items-center gap-6">
                                                         <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] whitespace-nowrap">{tier}</span>
-                                                        <div className="h-px flex-1 bg-white/5" />
+                                                        <div className="h-px flex-1 bg-zinc-800" />
                                                     </div>
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
                                                         {grouped[tier].map((spo: any, i: number) => (
-                                                            <div key={i} className="bg-white/[0.02] border border-white/5 rounded-3xl p-8 aspect-square flex flex-col items-center justify-center gap-4 hover:border-white/10 transition-all grayscale opacity-60 hover:grayscale-0 hover:opacity-100">
+                                                            <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-8 aspect-square flex flex-col items-center justify-center gap-4 hover:border-zinc-700 transition-all grayscale opacity-60 hover:grayscale-0 hover:opacity-100">
                                                                 {spo.logo_url ? (
                                                                     <img src={spo.logo_url} className="w-full h-full object-contain" alt={spo.name} />
                                                                 ) : (
@@ -829,7 +829,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                     <SectionHeader icon={<MessageSquare size={18} />} eyebrow="Guidance" title="Frequently Asked Questions" color="text-emerald-400" />
                                     <div className="space-y-4">
                                         {event.faqs.map((faq: any, i: number) => (
-                                            <div key={i} className="bg-zinc-900 border border-white/5 rounded-[2rem] overflow-hidden">
+                                            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                                                 <details className="group">
                                                     <summary className="flex items-center justify-between p-10 cursor-pointer list-none select-none">
                                                         <h4 className="text-lg font-black text-white tracking-tight uppercase italic">{faq.question}</h4>
@@ -837,7 +837,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                             <ChevronDown size={20} />
                                                         </div>
                                                     </summary>
-                                                    <div className="px-10 pb-10 text-base text-zinc-400 font-medium leading-[1.8] border-t border-white/5 pt-8">
+                                                    <div className="px-10 pb-10 text-base text-zinc-400 font-medium leading-[1.8] border-t border-zinc-800 pt-8">
                                                         {faq.answer}
                                                     </div>
                                                 </details>
@@ -853,7 +853,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             <div className="sticky top-32 space-y-8">
 
                                 {/* Status Card */}
-                                <div className="bg-zinc-900 border border-white/10 rounded-[3rem] p-10 space-y-10 shadow-3xl">
+                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 space-y-10 shadow-3xl">
                                     <div className="space-y-6">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Global Status</span>
@@ -868,21 +868,21 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 <span className="text-4xl font-black text-white">{registered}</span>
                                                 <span className="text-zinc-600 font-bold mb-1 text-sm"></span>
                                             </div>
-                                            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                                            <div className="h-2 bg-zinc-950 rounded-full overflow-hidden">
                                                 <div className="h-full bg-indigo-500" style={{ width: `${Math.min((registered / (event.venue?.capacity ?? 500)) * 100, 100)}%` }} />
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="space-y-6">
-                                        <div className="flex items-center gap-4 py-4 border-b border-white/5">
+                                        <div className="flex items-center gap-4 py-4 border-b border-zinc-800">
                                             <Calendar size={20} className="text-indigo-400" />
                                             <div>
                                                 <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Fest Dates</p>
                                                 <p className="text-sm font-black text-white uppercase italic">{fmtDateLong(event.start_time)}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4 py-4 border-b border-white/5">
+                                        <div className="flex items-center gap-4 py-4 border-b border-zinc-800">
                                             <MapPin size={20} className="text-rose-400" />
                                             <div>
                                                 <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Venue</p>
@@ -893,7 +893,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                     <button
                                         onClick={() => scrollTo("matrix")}
-                                        className="w-full h-16 rounded-[1.5rem] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-indigo-500 hover:text-white transition-all shadow-xl active:scale-95"
+                                        className="w-full h-16 rounded-xl bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-zinc-100 transition-all shadow-xl active:scale-95"
                                     >
                                         Explore Competitions <ArrowRight size={16} />
                                     </button>
@@ -906,9 +906,9 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                 </div>
 
                                 {/* Organizational Info */}
-                                <div className="bg-zinc-950/50 border border-white/5 rounded-[2.5rem] p-8 space-y-6">
+                                <div className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-8 space-y-6">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                                        <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center">
                                             <Globe size={18} className="text-zinc-500" />
                                         </div>
                                         <div>
@@ -918,7 +918,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                     </div>
                                     <button
                                         onClick={handleShare}
-                                        className="w-full py-4 rounded-xl border border-white/5 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-4 rounded-xl border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all flex items-center justify-center gap-2"
                                     >
                                         <Share2 size={12} /> Share Fest Hub
                                     </button>
@@ -936,7 +936,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             {event.status === "completed" && (
                                 <div className="space-y-12">
                                     {journey?.participated ? (
-                                        <div className="flex items-center gap-6 border-b border-white/5 pb-2">
+                                        <div className="flex items-center gap-6 border-b border-zinc-800 pb-2">
                                             <button
                                                 onClick={() => setActiveCompletedTab("journey")}
                                                 className={cn("text-lg font-black uppercase tracking-widest pb-4 -mb-[9px] transition-all", activeCompletedTab === "journey" ? "text-indigo-400 border-b-2 border-indigo-400" : "text-zinc-600 hover:text-zinc-400")}
@@ -951,13 +951,13 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-6 border-b border-white/5 pb-4">
+                                        <div className="flex items-center gap-6 border-b border-zinc-800 pb-4">
                                             <h3 className="text-lg font-black uppercase tracking-widest text-indigo-400">Event Recap</h3>
                                         </div>
                                     )}
 
                                     {activeCompletedTab === "journey" && journey?.participated ? (
-                                        <div className="bg-zinc-950 border border-white/5 p-8 md:p-12 rounded-[2.5rem] shadow-2xl space-y-10">
+                                        <div className="bg-zinc-950 border border-zinc-800 p-8 md:p-12 rounded-xl shadow-2xl space-y-10">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center border border-indigo-500/30 text-indigo-400">
                                                     <User size={32} />
@@ -970,13 +970,13 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {journey.teamName && (
-                                                    <div className="bg-[#09090b] p-6 rounded-3xl border border-white/5 space-y-2">
+                                                    <div className="bg-[#09090b] p-6 rounded-xl border border-zinc-800 space-y-2">
                                                         <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Represented Team</p>
                                                         <h4 className="text-xl font-black text-white italic">{journey.teamName}</h4>
                                                     </div>
                                                 )}
                                                 {journey.isWinner && (
-                                                    <div className="bg-amber-500/10 p-6 rounded-3xl border border-amber-500/20 space-y-2">
+                                                    <div className="bg-amber-500/10 p-6 rounded-xl border border-amber-500/20 space-y-2">
                                                         <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/70">Podium Finish</p>
                                                         <div className="flex items-center gap-2">
                                                             <Trophy size={18} className="text-amber-500" />
@@ -995,7 +995,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             <section ref={sectionRefs.about} id="about" className="space-y-8">
                                 <SectionHeader icon={<Star size={16} />} eyebrow="The Experience" title="Overview" color="text-indigo-400" />
                                 <div
-                                    className="bg-zinc-900/30 rounded-[2rem] p-8 md:p-12 border border-white/5 text-base text-zinc-400 font-medium leading-[1.85] prose prose-invert mx-auto max-w-none break-words"
+                                    className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 md:p-12 text-base text-zinc-400 font-medium leading-[1.85] prose prose-invert mx-auto max-w-none break-words"
                                     dangerouslySetInnerHTML={{ __html: event.rich_description || event.description || "Description coming soon." }}
                                 />
 
@@ -1008,7 +1008,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             {event.participation_tracks.map((track) => (
-                                                <div key={track.id} className="p-6 rounded-3xl bg-zinc-900/40 border border-white/5 flex items-center justify-between group/trk hover:border-indigo-500/30 transition-all">
+                                                <div key={track.id} className="p-6 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between group/trk hover:border-indigo-500/30 transition-all">
                                                     <div className="space-y-1">
                                                         <h4 className="text-sm font-black text-white uppercase tracking-tight group-hover/trk:text-indigo-400 transition-colors">{track.name}</h4>
                                                         <div className="flex items-center gap-2">
@@ -1020,7 +1020,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-zinc-700 group-hover/trk:text-indigo-400 transition-all">
+                                                    <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-500 group-hover/trk:text-indigo-400 transition-all">
                                                         {track.is_team ? <Users2 size={14} /> : <User size={14} />}
                                                     </div>
                                                 </div>
@@ -1039,7 +1039,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         {festDomains.length > 0 && (
                                             <div className="flex flex-wrap gap-2 pt-2">
                                                 {festDomains.map(d => (
-                                                    <span key={d.id} className="px-5 py-2.5 rounded-2xl bg-zinc-900 border border-white/5 text-[10px] font-black uppercase tracking-widest text-zinc-400" title={d.description}>
+                                                    <span key={d.id} className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400" title={d.description}>
                                                         {d.name}
                                                     </span>
                                                 ))}
@@ -1053,7 +1053,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     initial={{ opacity: 0, y: 10 }}
                                                     whileInView={{ opacity: 1, y: 0 }}
                                                     transition={{ delay: i * 0.05 }}
-                                                    className="bg-zinc-900/40 border border-white/5 p-8 rounded-[2rem] group hover:border-indigo-500/30 transition-all cursor-pointer relative overflow-hidden"
+                                                    className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl group hover:border-indigo-500/30 transition-all cursor-pointer relative overflow-hidden"
                                                     onClick={() => window.location.href = `/student/event/${sub.id}`}
                                                 >
                                                     <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
@@ -1097,7 +1097,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     const start = new Date(round.start_time).getTime();
                                                     const end = new Date(round.end_time).getTime();
 
-                                                    let statusBadge = { label: "Upcoming", color: "bg-zinc-800 text-zinc-500 border-white/5" };
+                                                    let statusBadge = { label: "Upcoming", color: "bg-zinc-800 text-zinc-500 border-zinc-800" };
                                                     let isLive = false;
                                                     let isClosed = false;
 
@@ -1127,10 +1127,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                             {/* Number bubble with glowing line */}
                                                             <div className="relative flex flex-col items-center">
                                                                 <div className={cn(
-                                                                    "shrink-0 w-14 h-14 rounded-2xl border flex items-center justify-center font-black text-xl z-20 transition-all duration-500",
+                                                                    "shrink-0 w-14 h-14 rounded-xl border flex items-center justify-center font-black text-xl z-20 transition-all duration-500",
                                                                     isLive ? "bg-emerald-500 text-black border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]" :
-                                                                        isClosed ? "bg-zinc-900 text-zinc-600 border-white/5" :
-                                                                            "bg-zinc-900 text-zinc-500 border-white/5"
+                                                                        isClosed ? "bg-zinc-900 text-zinc-600 border-zinc-800" :
+                                                                            "bg-zinc-900 text-zinc-500 border-zinc-800"
                                                                 )}>
                                                                     {idx + 1}
                                                                 </div>
@@ -1144,8 +1144,8 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                                             {/* Card */}
                                                             <div className={cn(
-                                                                "flex-1 p-6 md:p-8 bg-zinc-900/30 border rounded-[2rem] transition-all duration-500 group-hover:bg-zinc-900/40",
-                                                                isLive ? "border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.05)]" : "border-white/5"
+                                                                "flex-1 p-6 md:p-8 bg-zinc-900 border rounded-xl transition-all duration-500 group-hover:bg-zinc-800/50",
+                                                                isLive ? "border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.05)]" : "border-zinc-800"
                                                             )}>
                                                                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                                                                     <div className="space-y-4">
@@ -1157,7 +1157,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                                                 {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5" />}
                                                                                 {statusBadge.label}
                                                                             </span>
-                                                                            <span className={cn("px-3 py-1 rounded-full border border-white/10 bg-white/5 text-[9px] font-black uppercase tracking-widest text-zinc-400 leading-none")}>
+                                                                            <span className={cn("px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900 text-[9px] font-black uppercase tracking-widest text-zinc-400 leading-none")}>
                                                                                 {meta.label}
                                                                             </span>
                                                                         </div>
@@ -1189,7 +1189,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                                                     setIsSubModalOpen(true);
                                                                                 }}
                                                                                 className={cn(
-                                                                                    "px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2",
+                                                                                    "px-8 py-5 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2",
                                                                                     roundSubmission
                                                                                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-black"
                                                                                         : "bg-white text-black hover:bg-emerald-500 hover:text-white shadow-[0_10px_30px_rgba(255,255,255,0.1)]"
@@ -1202,12 +1202,12 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                                                 )}
                                                                             </button>
                                                                         ) : roundSubmission ? (
-                                                                            <div className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-500/60 transition-all">
+                                                                            <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-500/60 transition-all">
                                                                                 <CheckCircle2 size={14} />
                                                                                 <span className="text-[10px] font-black uppercase tracking-widest">Entry Received</span>
                                                                             </div>
                                                                         ) : isClosed ? (
-                                                                            <div className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-zinc-950/50 border border-white/5 text-zinc-600">
+                                                                            <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-zinc-950/50 border border-zinc-800 text-zinc-600">
                                                                                 <LockIcon size={14} />
                                                                                 <span className="text-[10px] font-black uppercase tracking-widest">Registration Closed</span>
                                                                             </div>
@@ -1220,7 +1220,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 })}
                                             </div>
                                         ) : (
-                                            <div className="h-40 bg-zinc-900/20 border border-white/5 border-dashed rounded-[2rem] flex items-center justify-center">
+                                            <div className="h-40 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl flex items-center justify-center">
                                                 <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">Schedule not yet announced</p>
                                             </div>
                                         )}
@@ -1241,7 +1241,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 href={event.rulebook_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="inline-flex w-full items-center justify-between p-5 bg-gradient-to-r from-orange-500/10 to-transparent border border-orange-500/20 rounded-[1.75rem] group hover:border-orange-500/40 transition-all"
+                                                className="inline-flex w-full items-center justify-between p-5 bg-gradient-to-r from-orange-500/10 to-transparent border border-zinc-800 rounded-xl group hover:border-orange-500/40 transition-all"
                                             >
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-black transition-all">
@@ -1261,7 +1261,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     { bg: "bg-amber-500/10", border: "border-amber-500/25", text: "text-amber-400", watermark: "text-amber-500/5" },
                                                     { bg: "bg-zinc-400/10", border: "border-zinc-400/20", text: "text-zinc-300", watermark: "text-zinc-400/5" },
                                                     { bg: "bg-orange-700/10", border: "border-orange-700/20", text: "text-orange-600", watermark: "text-orange-700/5" },
-                                                ][idx] ?? { bg: "bg-white/5", border: "border-white/5", text: "text-zinc-500", watermark: "text-white/5" };
+                                                ][idx] ?? { bg: "bg-zinc-900", border: "border-zinc-800", text: "text-zinc-500", watermark: "text-white/5" };
                                                 return (
                                                     <motion.div
                                                         key={prize.id}
@@ -1269,10 +1269,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                         whileInView={{ opacity: 1, y: 0 }}
                                                         viewport={{ once: true }}
                                                         transition={{ delay: idx * 0.07 }}
-                                                        className={cn("relative p-8 border rounded-[2rem] overflow-hidden group", rankStyle.bg, rankStyle.border)}
+                                                        className={cn("relative p-8 border rounded-xl overflow-hidden group", rankStyle.bg, rankStyle.border)}
                                                     >
                                                         <div className="flex gap-5 relative z-10">
-                                                            <div className={cn("w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0", rankStyle.bg, rankStyle.border, rankStyle.text)}>
+                                                            <div className={cn("w-12 h-12 rounded-xl border flex items-center justify-center shrink-0", rankStyle.bg, rankStyle.border, rankStyle.text)}>
                                                                 {prize.icon === "trophy" && <Trophy size={20} />}
                                                                 {prize.icon === "medal" && <Medal size={20} />}
                                                                 {prize.icon === "certificate" && <ScrollText size={20} />}
@@ -1312,10 +1312,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     whileInView={{ opacity: 1, y: 0 }}
                                                     viewport={{ once: true }}
                                                     transition={{ delay: idx * 0.07 }}
-                                                    className="relative p-8 bg-zinc-900/30 border border-white/5 rounded-[2rem] overflow-hidden group hover:border-indigo-500/30 transition-all"
+                                                    className="relative p-8 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden group hover:border-indigo-500/30 transition-all"
                                                 >
                                                     <div className="flex gap-5 relative z-10">
-                                                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
                                                             {perk.icon === "swag" || perk.icon === "goodie" ? <ShoppingBag size={20} /> : <Gift size={20} />}
                                                         </div>
                                                         <div className="space-y-1.5">
@@ -1343,13 +1343,13 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         <SectionHeader icon={<MessageSquare size={16} />} eyebrow="Have Questions?" title="FAQs" color="text-emerald-400" />
                                         <div className="space-y-4">
                                             {event.faqs.map((faq: any, i: number) => (
-                                                <div key={i} className="bg-zinc-900/30 border border-white/5 rounded-[2rem] overflow-hidden">
+                                                <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                                                     <details className="group">
                                                         <summary className="flex items-center justify-between p-8 cursor-pointer list-none">
                                                             <h4 className="text-base font-black text-white tracking-tight">{faq.question}</h4>
                                                             <ChevronRight size={20} className="text-zinc-500 group-open:rotate-90 transition-transform" />
                                                         </summary>
-                                                        <div className="px-8 pb-8 text-sm text-zinc-400 font-medium leading-relaxed border-t border-white/5 pt-6">
+                                                        <div className="px-8 pb-8 text-sm text-zinc-400 font-medium leading-relaxed border-t border-zinc-800 pt-6">
                                                             {faq.answer}
                                                         </div>
                                                     </details>
@@ -1367,7 +1367,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         <SectionHeader icon={<Handshake size={20} />} eyebrow="Our Partners" title="Sponsors" color="text-indigo-400" />
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
                                             {event.sponsors.map((spo: any, i: number) => (
-                                                <div key={i} className="group relative bg-zinc-900/30 border border-white/5 rounded-[2rem] p-8 flex flex-col items-center justify-center gap-4 hover:border-indigo-500/30 transition-all aspect-square">
+                                                <div key={i} className="group relative bg-zinc-950 border border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center gap-4 hover:border-indigo-500/30 transition-all aspect-square">
                                                     {spo.logo_url ? (
                                                         <img src={spo.logo_url} className="w-20 h-20 object-contain grayscale group-hover:grayscale-0 transition-all" alt={spo.name} />
                                                     ) : (
@@ -1389,8 +1389,8 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                 <SectionHeader icon={<Users2 size={16} />} eyebrow="Organizers" title="Team" color="text-cyan-400" />
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     {event.club && (
-                                        <div className="p-7 bg-zinc-900/30 border border-white/5 rounded-[2rem] flex items-center gap-5 hover:border-white/10 transition-all">
-                                            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center overflow-hidden shrink-0">
+                                        <div className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
+                                            <div className="w-16 h-16 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center overflow-hidden shrink-0">
                                                 {event.club.logo_url
                                                     ? <img src={event.club.logo_url} className="w-full h-full object-cover" alt={event.club.name} />
                                                     : <Globe size={28} className="text-indigo-400" />}
@@ -1402,8 +1402,8 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         </div>
                                     )}
                                     {event.creator && (
-                                        <div className="p-7 bg-zinc-900/30 border border-white/5 rounded-[2rem] flex items-center gap-5 hover:border-white/10 transition-all">
-                                            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+                                        <div className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
+                                            <div className="w-16 h-16 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
                                                 <span className="text-2xl font-black text-rose-400">{event.creator.full_name?.charAt(0) || "F"}</span>
                                             </div>
                                             <div>
@@ -1426,7 +1426,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             <div className="sticky top-20 space-y-5">
 
                                 {/* Primary Registration Card */}
-                                <div className="bg-zinc-900 border border-white/8 rounded-[2rem] overflow-hidden shadow-2xl">
+                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
                                     {/* Event mini-banner thumbnail */}
                                     {event.banner_url && (
                                         <div className="relative h-36 overflow-hidden">
@@ -1449,7 +1449,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 </div>
                                             </div>
                                             {/* Capacity bar */}
-                                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mt-3">
+                                            <div className="h-1.5 bg-zinc-950 rounded-full overflow-hidden mt-3">
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${fillPct}%` }}
@@ -1461,14 +1461,14 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                         {/* Date/Time info */}
                                         <div className="space-y-3">
-                                            <div className="flex items-center gap-3 py-3 border-b border-white/5">
+                                            <div className="flex items-center gap-3 py-3 border-b border-zinc-800">
                                                 <Calendar size={15} className="text-indigo-400 shrink-0" />
                                                 <div>
                                                     <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Date</p>
                                                     <p className="text-xs font-bold text-zinc-200">{fmtDateLong(event.start_time)}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3 py-3 border-b border-white/5">
+                                            <div className="flex items-center gap-3 py-3 border-b border-zinc-800">
                                                 <Clock size={15} className="text-rose-400 shrink-0" />
                                                 <div>
                                                     <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Time</p>
@@ -1493,7 +1493,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     href={event.rulebook_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white transition-all group"
+                                                    className="w-full h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white transition-all group"
                                                 >
                                                     <ScrollText size={14} /> Read Rulebook
                                                 </a>
@@ -1501,11 +1501,11 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                             {/* Observer sees read-only badge instead of register button */}
                                             {isObserver ? (
-                                                <div className="w-full h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                                                <div className="w-full h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
                                                     <Eye size={14} /> Institutional Observer
                                                 </div>
                                             ) : isOrganizer ? (
-                                                <div className="w-full p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-center">
+                                                <div className="w-full p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center">
                                                     <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest leading-loose">
                                                         Organizers are not eligible to participate in their own events
                                                     </p>
@@ -1515,9 +1515,9 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     onClick={handleRegister}
                                                     disabled={regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading" || previewMode}
                                                     className={cn(
-                                                        "w-full min-h-[52px] py-3.5 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/50",
+                                                        "w-full min-h-[52px] py-3.5 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/50",
                                                         previewMode
-                                                            ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5"
+                                                            ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-800"
                                                             : (regStatus === "registered" || regStatus === "confirmed")
                                                                 ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 cursor-default"
                                                                 : (regStatus === "pending" || regStatus === "waitlisted")
@@ -1551,7 +1551,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                         {/* Resource & Community Links */}
                                         {event.resource_links && event.resource_links.length > 0 && (
-                                            <div className="pt-6 border-t border-white/5 space-y-3">
+                                            <div className="pt-6 border-t border-zinc-800 space-y-3">
                                                 <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest px-1">Resources & Links</p>
                                                 <div className="grid grid-cols-1 gap-2">
                                                     {event.resource_links.map((link: any, idx: number) => {
@@ -1564,7 +1564,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                             <button
                                                                 key={idx}
                                                                 onClick={() => window.open(link.url, '_blank')}
-                                                                className="flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all group"
+                                                                className="flex items-center justify-between p-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-all group"
                                                             >
                                                                 <div className="flex items-center gap-3">
                                                                     <div className={cn(
@@ -1586,7 +1586,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         {/* Share */}
                                         <button
                                             onClick={handleShare}
-                                            className="w-full h-10 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-zinc-500 hover:text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                            className="w-full h-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 transition-all text-zinc-500 hover:text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
                                         >
                                             {copied ? <Check size={13} className="text-emerald-400" /> : <Share2 size={13} />}
                                             {copied ? "Link Copied!" : "Share Event"}
@@ -1595,7 +1595,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                 </div>
 
                                 {/* Quick details card */}
-                                <div className="bg-zinc-900/50 border border-white/5 rounded-[1.75rem] p-5 space-y-3">
+                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
                                     <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest px-1">Event Details</p>
                                     {([] as { icon: React.ReactNode; label: string; value: string; color: string }[])
                                         .concat([
@@ -1625,7 +1625,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             onClick={handleRegister}
                             disabled={regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading"}
                             className={cn(
-                                "w-full h-14 rounded-2xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                                "w-full h-14 rounded-xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
                                 (regStatus === "registered" || regStatus === "confirmed")
                                     ? "bg-emerald-500 text-black"
                                     : isSoldOut
@@ -1687,12 +1687,12 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="relative w-full max-w-6xl max-h-[90vh] bg-zinc-950 border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col"
+                            className="relative w-full max-w-6xl max-h-[90vh] bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col"
                         >
                             {/* Modal Header */}
-                            <div className="flex items-center justify-between p-8 border-b border-white/5 bg-zinc-900/50">
+                            <div className="flex items-center justify-between p-8 border-b border-zinc-800 bg-zinc-900/50">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                    <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                                         <Layers size={24} />
                                     </div>
                                     <div>
@@ -1702,7 +1702,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                 </div>
                                 <button
                                     onClick={() => setIsSubModalOpen(false)}
-                                    className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                                    className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
                                 >
                                     <X size={20} />
                                 </button>
@@ -1744,7 +1744,7 @@ function WinnerGallery({ prizes }: { prizes: EventPrize[] }) {
         1: { bar: "h-28", bg: "bg-amber-500/15", border: "border-amber-500/30", text: "text-amber-400", icon: <Trophy size={20} />, label: "1st Place" },
         2: { bar: "h-20", bg: "bg-zinc-400/10", border: "border-zinc-400/20", text: "text-zinc-300", icon: <Medal size={18} />, label: "2nd Place" },
         3: { bar: "h-14", bg: "bg-orange-700/10", border: "border-orange-700/20", text: "text-orange-500", icon: <Award size={16} />, label: "3rd Place" },
-    }[pos] ?? { bar: "h-10", bg: "bg-white/5", border: "border-white/5", text: "text-zinc-500", icon: null, label: `${pos}th Place` });
+    }[pos] ?? { bar: "h-10", bg: "bg-zinc-900", border: "border-zinc-800", text: "text-zinc-500", icon: null, label: `${pos}th Place` });
 
     return (
         <section className="space-y-8">
@@ -1769,7 +1769,7 @@ function WinnerGallery({ prizes }: { prizes: EventPrize[] }) {
                             viewport={{ once: true }}
                             transition={{ delay: prize.position * 0.08 }}
                             className={cn(
-                                "flex-1 max-w-[180px] rounded-2xl border overflow-hidden",
+                                "flex-1 max-w-[180px] rounded-xl border overflow-hidden",
                                 s.bg, s.border
                             )}
                         >
@@ -1795,7 +1795,7 @@ function WinnerGallery({ prizes }: { prizes: EventPrize[] }) {
             {rest.length > 0 && (
                 <div className="space-y-2">
                     {rest.map((prize, idx) => (
-                        <div key={prize.id} className="flex items-center gap-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+                        <div key={prize.id} className="flex items-center gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
                             <span className="text-sm font-black text-zinc-600 w-6 text-center">{prize.position}</span>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-white truncate">
@@ -1823,9 +1823,9 @@ function WinnersSection({ prizes }: { prizes: EventPrize[] }) {
 // ── Generic Detail Row ────────────────────────────────────────────────────────
 function DetailRow({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
     return (
-        <div className="flex items-center justify-between py-3 border-b border-white/[0.03] last:border-0 hover:bg-white/[0.01] transition-colors rounded-xl px-2 -mx-2">
+        <div className="flex items-center justify-between py-3 border-b border-zinc-800/30 last:border-0 hover:bg-zinc-900 transition-colors rounded-xl px-2 -mx-2">
             <div className="flex items-center gap-3">
-                <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-950 border border-white/5", color)}>
+                <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-950 border border-zinc-800", color)}>
                     {icon}
                 </div>
                 <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{label}</span>
@@ -1857,7 +1857,7 @@ function DomainNavButton({ active, onClick, label }: { active: boolean; onClick:
                 "relative h-10 px-6 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
                 active
                     ? "bg-white text-black shadow-lg shadow-white/10 scale-105"
-                    : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white"
+                    : "bg-zinc-900 text-zinc-500 hover:bg-zinc-800 hover:text-white"
             )}
         >
             {label}
@@ -1881,7 +1881,7 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="w-full max-w-lg bg-zinc-950 border border-white/10 rounded-[3rem] shadow-3xl overflow-hidden"
+                className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-3xl overflow-hidden"
             >
                 <div className="p-10 space-y-8">
                     <div className="flex items-center justify-between">
@@ -1892,13 +1892,13 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                             </h3>
                             <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-[0.2em]">Select your specific competition category</p>
                         </div>
-                        <button onClick={onClose} className="p-3 rounded-2xl hover:bg-white/5 text-zinc-600 transition-all">
+                        <button onClick={onClose} className="p-3 rounded-xl hover:bg-zinc-900 text-zinc-600 transition-all">
                             <X size={20} />
                         </button>
                     </div>
 
                     {/* Rulebook Warning */}
-                    <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
                         <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
                             <ScrollText size={18} />
                         </div>
@@ -1929,10 +1929,10 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                                 key={track.id}
                                 onClick={() => setSelectedId(track.id)}
                                 className={cn(
-                                    "p-6 rounded-[2rem] border text-left transition-all relative overflow-hidden group/item",
+                                    "p-6 rounded-xl border text-left transition-all relative overflow-hidden group/item",
                                     selectedId === track.id
                                         ? "bg-indigo-500 border-indigo-500 shadow-xl shadow-indigo-500/10"
-                                        : "bg-zinc-900/50 border-white/5 hover:border-white/10"
+                                        : "bg-zinc-900 border border-zinc-800 hover:border-zinc-700"
                                 )}
                             >
                                 <div className="flex items-center justify-between relative z-10 font-black">
@@ -1948,11 +1948,11 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                                         </div>
                                     </div>
                                     {selectedId === track.id ? (
-                                        <div className="w-10 h-10 rounded-2xl bg-white text-indigo-500 flex items-center justify-center shadow-xl">
+                                        <div className="w-10 h-10 rounded-xl bg-white text-indigo-500 flex items-center justify-center shadow-xl">
                                             <Check size={20} strokeWidth={4} />
                                         </div>
                                     ) : (
-                                        <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-zinc-800">
+                                        <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-800">
                                             <ArrowRight size={20} />
                                         </div>
                                     )}

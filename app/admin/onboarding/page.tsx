@@ -518,9 +518,11 @@ export default function RosterManagementPage() {
                                         onChange={(e) => setSelectedDept(e.target.value)}
                                         className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-11 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500/50 appearance-none font-medium transition-all"
                                     >
-                                        <option value="all">All Departments</option>
+                                        <option value="all" className="bg-[#0c0c14] text-white">All Departments</option>
                                         {departments.map((d) => (
-                                            <option key={d.id} value={d.id}>{d.name}</option>
+                                            <option key={d.id} value={d.id} className="bg-[#0c0c14] text-white">
+                                                {d.name}
+                                            </option>
                                         ))}
                                     </select>
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">

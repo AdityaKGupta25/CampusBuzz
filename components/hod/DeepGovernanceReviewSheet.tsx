@@ -142,10 +142,10 @@ export function DeepGovernanceReviewSheet({
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 200 }}
-                className="relative bg-[#09090b] w-full max-w-2xl h-full shadow-2xl flex flex-col border-l border-white/5"
+                className="relative bg-zinc-950 w-full max-w-2xl h-full shadow-2xl flex flex-col border-l border-zinc-800"
             >
                 {/* Header */}
-                <div className="px-10 py-10 border-b border-white/5 flex items-center justify-between bg-zinc-950/50 backdrop-blur-xl shrink-0">
+                <div className="px-10 py-10 border-b border-zinc-800 flex items-center justify-between bg-zinc-950 backdrop-blur-xl shrink-0">
                     <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                             <div className="w-5 h-5 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
@@ -157,7 +157,7 @@ export function DeepGovernanceReviewSheet({
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all hover:bg-white/10"
+                        className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white/40 hover:text-white transition-all hover:bg-zinc-800/80"
                     >
                         <XCircle size={20} />
                     </button>
@@ -171,7 +171,7 @@ export function DeepGovernanceReviewSheet({
                             <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="p-6 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex gap-4 text-rose-500 animate-pulse shadow-lg shadow-rose-500/5 mb-8"
+                                className="p-6 rounded-xl bg-rose-500/10 border border-rose-500/20 flex gap-4 text-rose-500 animate-pulse shadow-lg shadow-rose-500/5 mb-8"
                             >
                                 <AlertCircle size={24} className="shrink-0" />
                                 <div className="space-y-1">
@@ -184,7 +184,7 @@ export function DeepGovernanceReviewSheet({
                             <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="p-6 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex gap-4 text-amber-500 shadow-lg shadow-amber-500/5 mb-8"
+                                className="p-6 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-4 text-amber-500 shadow-lg shadow-amber-500/5 mb-8"
                             >
                                 <AlertTriangle size={24} className="shrink-0" />
                                 <div className="space-y-1">
@@ -197,7 +197,7 @@ export function DeepGovernanceReviewSheet({
 
                     {/* Visual Asset if exists */}
                     {event.bannerUrl && (
-                        <div className="w-full aspect-video rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl relative group">
+                        <div className="w-full aspect-video rounded-xl overflow-hidden border border-zinc-800 shadow-2xl relative group">
                             <img
                                 src={event.bannerUrl}
                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
@@ -216,7 +216,7 @@ export function DeepGovernanceReviewSheet({
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Identity & Origin</h3>
                         </div>
 
-                        <div className="p-8 rounded-[2rem] bg-zinc-900/40 border border-white/5 space-y-8">
+                        <div className="p-8 rounded-xl bg-zinc-900 border border-zinc-800 space-y-8">
                             <div className="grid grid-cols-2 gap-y-8 gap-x-12">
                                 {[
                                     { label: "Lead Faculty", value: event.faculty, icon: User, color: "text-cyan-400" },
@@ -234,7 +234,7 @@ export function DeepGovernanceReviewSheet({
                                 ))}
                             </div>
 
-                            <div className="pt-8 border-t border-white/5">
+                            <div className="pt-8 border-t border-zinc-800">
                                 <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-3">Executive Summary</p>
                                 <p className="text-sm text-zinc-400 font-medium leading-relaxed italic">
                                     "{event.description || "No description provided."}"
@@ -251,12 +251,12 @@ export function DeepGovernanceReviewSheet({
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className={cn(
-                                "p-8 rounded-[2rem] border flex flex-col justify-between group transition-all",
+                                "p-8 rounded-xl border flex flex-col justify-between group transition-all",
                                 event.riskLevel === 'high' ? "bg-rose-500/5 border-rose-500/20" : "bg-emerald-500/5 border-emerald-500/20"
                             )}>
                                 <div className="space-y-4">
                                     <div className={cn(
-                                        "w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110",
+                                        "w-12 h-12 rounded-xl flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110",
                                         event.riskLevel === 'high' ? "bg-rose-500/20" : "bg-emerald-500/20"
                                     )}>
                                         <AlertTriangle size={24} className={event.riskLevel === 'high' ? "text-rose-400" : "text-emerald-400"} />
@@ -273,13 +273,13 @@ export function DeepGovernanceReviewSheet({
                                 </div>
                             </div>
 
-                            <div className="p-8 rounded-[2rem] bg-indigo-600 border border-white/10 flex flex-col justify-between group transition-all shadow-xl shadow-indigo-500/10">
+                            <div className="p-8 rounded-xl bg-indigo-600 border border-indigo-500/20 flex flex-col justify-between group transition-all shadow-xl shadow-indigo-500/10">
                                 <div className="space-y-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
                                         <IndianRupee size={24} className="text-white" />
                                     </div>
                                     <div>
-                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/50 mb-1">Budget Allocation</p>
+                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-indigo-100/50 mb-1">Budget Allocation</p>
                                         <p className="text-2xl font-black text-white tracking-tighter">
                                             ₹{event.budgetRequired.toLocaleString('en-IN')}
                                         </p>
@@ -296,7 +296,7 @@ export function DeepGovernanceReviewSheet({
                                 <Box size={14} className="text-cyan-500" />
                                 <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Fest Infrastructure</h3>
                             </div>
-                            <div className="p-8 rounded-[2rem] bg-zinc-900/40 border border-white/5 space-y-6">
+                            <div className="p-8 rounded-xl bg-zinc-900 border border-zinc-800 space-y-6">
                                 <div className="flex items-center justify-between">
                                     <div className="space-y-1">
                                         <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Institutional Domains</p>
@@ -308,8 +308,8 @@ export function DeepGovernanceReviewSheet({
                                 <div className="grid grid-cols-1 gap-3">
                                     {domains.length > 0 ? (
                                         domains.map((domain: any, idx: number) => (
-                                            <div key={domain.id} className="flex items-center gap-4 p-4 bg-white/[0.03] border border-white/5 rounded-2xl hover:border-cyan-500/20 transition-all">
-                                                <div className="w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center text-[10px] font-black text-cyan-400 border border-white/5">
+                                            <div key={domain.id} className="flex items-center gap-4 p-4 bg-zinc-950 border border-zinc-800 rounded-xl hover:border-cyan-500/20 transition-all">
+                                                <div className="w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center text-[10px] font-black text-cyan-400 border border-zinc-800">
                                                     {idx + 1}
                                                 </div>
                                                 <div>
@@ -320,7 +320,7 @@ export function DeepGovernanceReviewSheet({
                                         ))
                                     ) : (
                                         !loadingDomains && (
-                                            <div className="py-4 text-center border-2 border-dashed border-white/5 rounded-2xl">
+                                            <div className="py-4 text-center border-2 border-dashed border-zinc-800 rounded-xl">
                                                 <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">No domains defined yet.</p>
                                             </div>
                                         )
@@ -336,7 +336,7 @@ export function DeepGovernanceReviewSheet({
                             <Clock size={14} className="text-zinc-500" />
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Timeline Analysis</h3>
                         </div>
-                        <div className="p-8 bg-zinc-900/40 border border-white/5 rounded-[2rem] space-y-8">
+                        <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-xl space-y-8">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1.5">
                                     <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Commencement</p>
@@ -345,7 +345,7 @@ export function DeepGovernanceReviewSheet({
                                         <p className="text-lg font-black text-white tracking-tight">{formatDate(event.startDate)}</p>
                                     </div>
                                 </div>
-                                <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center border border-white/5">
+                                <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center border border-zinc-800">
                                     <ArrowRight size={18} className="text-zinc-700" />
                                 </div>
                                 <div className="space-y-1.5 text-right">
@@ -358,19 +358,19 @@ export function DeepGovernanceReviewSheet({
                             </div>
 
                             {event.rounds && event.rounds.length > 0 && (
-                                <div className="space-y-4 pt-6 border-t border-white/5">
+                                <div className="space-y-4 pt-6 border-t border-zinc-800">
                                     <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Procedural Rounds</p>
                                     <div className="space-y-2">
                                         {event.rounds.map((r: any, idx: number) => (
-                                            <div key={r.id || idx} className="flex items-center gap-4 p-4 bg-zinc-950/50 rounded-2xl border border-white/5 group transition-colors hover:border-white/10">
-                                                <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-[10px] font-black text-zinc-500 group-hover:text-cyan-400 transition-colors">
+                                            <div key={r.id || idx} className="flex items-center gap-4 p-4 bg-zinc-950 border border-zinc-800 group transition-colors hover:border-zinc-700 rounded-xl">
+                                                <div className="w-8 h-8 rounded-xl bg-zinc-900 flex items-center justify-center text-[10px] font-black text-zinc-500 group-hover:text-cyan-400 transition-colors">
                                                     {idx + 1}
                                                 </div>
                                                 <div className="flex-1">
                                                     <p className="text-xs font-bold text-white tracking-tight uppercase">{r.title}</p>
                                                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{r.type || "Round"}</p>
                                                 </div>
-                                                <Badge variant="draft" className="bg-white/5 text-zinc-500 border-none px-3 py-1 text-[8px] tracking-widest">ACTIVE</Badge>
+                                                <Badge variant="draft" className="bg-zinc-900 text-zinc-500 border-none px-3 py-1 text-[8px] tracking-widest">ACTIVE</Badge>
                                             </div>
                                         ))}
                                     </div>
@@ -385,7 +385,7 @@ export function DeepGovernanceReviewSheet({
                             <Clock size={14} className="text-cyan-500" />
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Institutional Pulse (Campus Activity)</h3>
                         </div>
-                        <div className="p-8 rounded-[2rem] bg-zinc-900/40 border border-white/5 space-y-6">
+                        <div className="p-8 rounded-xl bg-zinc-900 border border-zinc-800 space-y-6">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Simultaneous Operations</p>
@@ -397,8 +397,8 @@ export function DeepGovernanceReviewSheet({
                             <div className="grid grid-cols-1 gap-3">
                                 {campusActivity.length > 0 ? (
                                     campusActivity.map((activity) => (
-                                        <div key={activity.id} className="flex items-center gap-4 p-4 bg-white/[0.03] border border-white/5 rounded-2xl hover:border-cyan-500/20 transition-all group">
-                                            <div className="w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center text-cyan-500/30 group-hover:text-cyan-400 transition-colors border border-white/5">
+                                        <div key={activity.id} className="flex items-center gap-4 p-4 bg-zinc-950 border border-zinc-800 rounded-xl hover:border-cyan-500/20 transition-all group">
+                                            <div className="w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center text-cyan-500/30 group-hover:text-cyan-400 transition-colors border border-zinc-800">
                                                 <CalendarDays size={18} />
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -421,8 +421,8 @@ export function DeepGovernanceReviewSheet({
                                     ))
                                 ) : (
                                     !loadingActivity && (
-                                        <div className="py-8 text-center border-2 border-dashed border-white/5 rounded-[2rem] bg-zinc-950/20">
-                                            <CheckCircle2 size={24} className="mx-auto text-emerald-500/20 mb-3" />
+                                        <div className="py-8 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-950">
+                                            <AlertCircle size={24} className="mx-auto text-emerald-500/20 mb-3" />
                                             <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Campus schedule is clear</p>
                                             <p className="text-[9px] text-zinc-700 font-medium mt-1 uppercase">No conflicting events detected for this date</p>
                                         </div>
@@ -438,7 +438,7 @@ export function DeepGovernanceReviewSheet({
                             <ListChecks size={14} className="text-zinc-500" />
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Threat & Compliance</h3>
                         </div>
-                        <div className="p-8 rounded-[2rem] bg-zinc-900/40 border border-white/5 space-y-6">
+                        <div className="p-8 rounded-xl bg-zinc-900 border border-zinc-800 space-y-6">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck size={14} className="text-indigo-400" />
                                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Compliance Sync</p>
@@ -446,10 +446,10 @@ export function DeepGovernanceReviewSheet({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {event.complianceChecklist.length > 0 ? (
                                     event.complianceChecklist.map((item: any) => (
-                                        <div key={item.id} className="flex items-center gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl text-[11px] font-bold text-zinc-400 transition-all hover:bg-white/[0.04]">
+                                        <div key={item.id} className="flex items-center gap-3 p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-[11px] font-bold text-zinc-400 transition-all hover:bg-zinc-900">
                                             <div className={cn(
                                                 "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
-                                                item.checked ? "bg-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-white/5 border-white/10"
+                                                item.checked ? "bg-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-zinc-900 border-zinc-800"
                                             )}>
                                                 {item.checked && <XCircle size={12} className="text-white bg-emerald-500 rounded-full" />}
                                                 {/* Wait, the checkmark was actually using CheckCircle2 in the original, let me fix it */}
@@ -467,11 +467,11 @@ export function DeepGovernanceReviewSheet({
 
                 {/* Decision Action Bar */}
                 {/* Decision Action Bar — only for pending events */}
-                <div className="px-10 py-8 border-t border-white/5 bg-zinc-950/80 backdrop-blur-xl shrink-0">
+                <div className="px-10 py-8 border-t border-zinc-800 bg-zinc-950 backdrop-blur-xl shrink-0">
                     {event.status === "pending" ? (
                         <div className="space-y-6">
                             {conflictStatus.type === 'SOFT' && (
-                                <div className="flex items-center gap-4 px-6 py-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
+                                <div className="flex items-center gap-4 px-6 py-4 bg-amber-500/5 border border-amber-500/10 rounded-xl">
                                     <input
                                         type="checkbox"
                                         id="oversight-check"
@@ -489,7 +489,7 @@ export function DeepGovernanceReviewSheet({
                                 <button
                                     id="hod-reject-btn"
                                     onClick={() => onReject(event.id)}
-                                    className="h-14 rounded-2xl bg-zinc-900 border border-white/5 text-zinc-500 hover:bg-rose-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.25em]"
+                                    className="h-14 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:bg-rose-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.25em]"
                                 >
                                     Reject Proposal
                                 </button>
@@ -497,7 +497,7 @@ export function DeepGovernanceReviewSheet({
                                     id="hod-changes-btn"
                                     onClick={() => onInviteChanges(event.id)}
                                     className={cn(
-                                        "h-14 rounded-2xl transition-all text-[10px] font-black uppercase tracking-[0.25em]",
+                                        "h-14 rounded-xl transition-all text-[10px] font-black uppercase tracking-[0.25em]",
                                         conflictStatus.type === 'HARD'
                                             ? "bg-amber-500 text-black shadow-xl shadow-amber-500/20"
                                             : "bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-white"
@@ -510,9 +510,9 @@ export function DeepGovernanceReviewSheet({
                                     disabled={conflictStatus.type === 'HARD' || (conflictStatus.type === 'SOFT' && !confirmOversight)}
                                     onClick={() => onApprove(event.id)}
                                     className={cn(
-                                        "h-14 rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] transition-all active:scale-95",
+                                        "h-14 rounded-xl font-black text-[10px] uppercase tracking-[0.25em] transition-all active:scale-95",
                                         conflictStatus.type === 'HARD' || (conflictStatus.type === 'SOFT' && !confirmOversight)
-                                            ? "bg-zinc-900 border border-white/5 text-zinc-700 cursor-not-allowed grayscale"
+                                            ? "bg-zinc-900 border border-zinc-800 text-zinc-700 cursor-not-allowed grayscale"
                                             : "bg-emerald-500 text-black hover:bg-emerald-400 shadow-xl shadow-emerald-500/10"
                                     )}
                                 >
@@ -524,7 +524,7 @@ export function DeepGovernanceReviewSheet({
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className={cn(
-                                    "w-12 h-12 rounded-2xl flex items-center justify-center",
+                                    "w-12 h-12 rounded-xl flex items-center justify-center",
                                     event.status === "archived" ? "bg-zinc-800 text-zinc-400" : "bg-emerald-500/10 text-emerald-400"
                                 )}>
                                     {event.status === "archived" ? <Archive size={24} /> : <ShieldCheck size={24} />}
@@ -538,7 +538,7 @@ export function DeepGovernanceReviewSheet({
                             </div>
                             <div className="text-right">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-1">Audit Mode</p>
-                                <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+                                <span className="px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
                                     Read-Only Immutable
                                 </span>
                             </div>

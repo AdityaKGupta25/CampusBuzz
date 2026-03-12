@@ -40,7 +40,7 @@ function Sidebar({
     return (
         <aside
             className={cn(
-                "hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-300 z-40",
+                "hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-300 z-[100]",
                 collapsed ? "w-[68px]" : "w-[220px]"
             )}
             style={{ background: "#0c0c14", borderRight: "1px solid rgba(255,255,255,0.07)" }}
@@ -125,10 +125,15 @@ function Sidebar({
             <button
                 id="sidebar-collapse-btn"
                 onClick={onToggle}
-                className="absolute -right-3 top-[72px] w-6 h-6 rounded-full flex items-center justify-center z-50 hover:scale-110 transition-transform"
-                style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.5)", boxShadow: "0 2px 8px rgba(0,0,0,0.5)" }}
+                className="absolute -right-3.5 top-[72px] w-7 h-7 rounded-full flex items-center justify-center z-[110] hover:scale-110 transition-transform shadow-2xl"
+                style={{
+                    background: "#1a1a2e",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    color: "rgba(255,255,255,1)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.8)",
+                }}
             >
-                {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+                {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
         </aside>
     );
@@ -255,6 +260,13 @@ export default function HODLayout({ children }: { children: React.ReactNode }) {
         const saved = localStorage.getItem("cb_hod_sidebar_collapsed");
         if (saved === "1") setCollapsed(true);
     }, []);
+
+    useEffect(() => {
+        if (!user && !localStorage.getItem("supabase.auth.token")) return;
+        if (user && user.role !== "hod") {
+            router.replace(`/${user.role}/dashboard`);
+        }
+    }, [user, router]);
 
     function toggleCollapse() {
         setCollapsed((v) => {

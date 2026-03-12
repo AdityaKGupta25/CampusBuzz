@@ -145,9 +145,9 @@ export function ExploreFeed() {
     }
 
     return (
-        <div className="flex-1 flex flex-col min-w-0 bg-[#09090b] selection:bg-indigo-500/30">
+        <div className="flex-1 flex flex-col min-w-0 bg-[#09090b] selection:bg-indigo-500/30 overflow-x-hidden">
             {/* Header / Search / Filters */}
-            <div className="px-10 pt-16 pb-8 space-y-10 border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl sticky top-0 z-50">
+            <div className="px-10 md:px-16 pt-16 pb-8 space-y-10 border-b border-white/5 bg-zinc-950/50 backdrop-blur-xl sticky top-0 z-40">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
@@ -192,7 +192,7 @@ export function ExploreFeed() {
             <div className="flex-1 overflow-y-auto pb-32 space-y-20 scrollbar-hide">
 
                 {/* Visual Section 1: Campus Units (Real Data) */}
-                <section className="px-10 mt-10">
+                <section className="px-10 md:px-16 mt-10">
                     <div className="flex items-center gap-4 mb-8">
                         <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Official Campus Units</span>
                         <div className="h-px flex-1 bg-white/5" />
@@ -264,7 +264,7 @@ export function ExploreFeed() {
 
                 {/* Section 4: 🏛️ INSTITUTIONAL ARCHIVE (Completed) */}
                 <section className="space-y-10">
-                    <div className="px-10 flex items-center justify-between">
+                    <div className="px-10 md:px-16 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-[1.2rem] bg-zinc-900 border border-white/5 flex items-center justify-center">
                                 <History size={16} className="text-zinc-500" />
@@ -278,7 +278,7 @@ export function ExploreFeed() {
                     </div>
 
                     {pastEvents.length > 0 ? (
-                        <div className="flex gap-8 overflow-x-auto px-10 pb-10 scrollbar-hide snap-x">
+                        <div className="flex gap-8 overflow-x-auto px-10 md:px-16 pb-10 scrollbar-hide snap-x">
                             {pastEvents.map((event) => (
                                 <ExploreCard
                                     key={event.id}
@@ -300,7 +300,7 @@ export function ExploreFeed() {
 
                 {/* Global Empty State */}
                 {filteredEvents.length === 0 && !loading && (
-                    <div className="mx-10 py-32 text-center border-2 border-dashed border-white/5 rounded-[4rem] bg-white/[0.01]">
+                    <div className="mx-10 md:mx-16 py-32 text-center border-2 border-dashed border-white/5 rounded-[4rem] bg-white/[0.01]">
                         <p className="text-sm font-bold text-white/20 italic tracking-widest uppercase">"No echoes found in the campus digital footprint..."</p>
                     </div>
                 )}
@@ -331,7 +331,7 @@ function EventSection({ title, icon, events, onSelect }: {
 
     return (
         <section className="space-y-10">
-            <div className="px-10 flex items-center justify-between">
+            <div className="px-10 md:px-16 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-[1.2rem] bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-lg">
                         {icon}
@@ -344,7 +344,7 @@ function EventSection({ title, icon, events, onSelect }: {
                 <div className="h-px flex-1 bg-white/5 ml-12" />
             </div>
 
-            <div className="flex flex-col gap-12 overflow-x-auto px-10 pb-10 scrollbar-hide snap-x">
+            <div className="flex flex-col gap-12 overflow-x-auto px-10 md:px-16 pb-10 scrollbar-hide snap-x">
                 {/* First show Mega Fests in Wide format */}
                 {umbrellaEvents.length > 0 && (
                     <div className="flex gap-8">

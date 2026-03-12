@@ -249,15 +249,19 @@ export function VenueRegistry() {
                         className="w-full bg-zinc-800/40 border-none rounded-xl h-12 pl-12 pr-4 text-sm focus:ring-1 focus:ring-cyan-500/50 transition-all font-medium"
                     />
                 </div>
-                <div className="flex items-center gap-2 p-1.5 bg-zinc-800/40 rounded-xl border border-white/5">
-                    <Filter className="ml-2 text-zinc-500" size={16} />
+                <div className="flex items-center gap-2 p-1.5 bg-zinc-800/40 rounded-xl border border-white/10 hover:border-white/20 hover:bg-zinc-800/60 transition-all group/filter">
+                    <Filter className="ml-2 text-zinc-500 group-hover/filter:text-cyan-400 transition-colors" size={16} />
                     <select
                         value={filterType}
                         onChange={(e) => setFilterType(e.target.value)}
-                        className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest focus:ring-0 cursor-pointer"
+                        className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest focus:ring-0 cursor-pointer text-white/70 hover:text-white transition-colors min-w-[110px]"
                     >
-                        <option value="all">All Types</option>
-                        {VENUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        <option value="all" className="bg-[#0c0c14] text-white">All Types</option>
+                        {VENUE_TYPES.map(t => (
+                            <option key={t} value={t} className="bg-[#0c0c14] text-white">
+                                {t}
+                            </option>
+                        ))}
                     </select>
                 </div>
             </div>

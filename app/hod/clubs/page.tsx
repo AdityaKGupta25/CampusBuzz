@@ -175,9 +175,10 @@ export default function HodClubsPage() {
 
                 <Button
                     onClick={() => setIsModalOpen(true)}
-                    className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold h-12 px-6 rounded-2xl shadow-lg shadow-cyan-900/20"
+                    icon={<Plus size={20} />}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold h-12 px-6 rounded-2xl shadow-lg shadow-cyan-900/20 whitespace-nowrap"
                 >
-                    <Plus size={20} className="mr-2" /> Create New Club
+                    Create New Club
                 </Button>
             </div>
 

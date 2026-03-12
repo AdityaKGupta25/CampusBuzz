@@ -387,7 +387,7 @@ export default function CreateEventWizard() {
     }
 
     return (
-        <div className="min-h-screen bg-[#09090b] text-white selection:bg-cyan-500/30 font-sans">
+        <div className="min-h-[calc(100vh-3.5rem)] md:min-h-screen bg-[#09090b] text-white selection:bg-cyan-500/30 font-sans flex flex-col">
             {/* 1. Header Navigation */}
             <div className="max-w-3xl mx-auto px-6 pt-10 pb-6">
                 <div className="flex items-center justify-between mb-8">
@@ -416,7 +416,7 @@ export default function CreateEventWizard() {
             </div>
 
             {/* 2. Structured Form Content */}
-            <main className="max-w-3xl mx-auto px-6 pb-40 pt-4">
+            <main className="max-w-3xl mx-auto px-6 pb-20 pt-4 flex-1 w-full">
                 <AnimatePresence mode="wait" custom={direction}>
                     <motion.div
                         key={step}
@@ -426,7 +426,7 @@ export default function CreateEventWizard() {
                         animate="center"
                         exit="exit"
                         transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="bg-zinc-900/40 border border-white/5 p-6 md:p-8 rounded-3xl shadow-3xl backdrop-blur-xl"
+                        className="bg-zinc-950 border border-zinc-800 p-6 md:p-8 rounded-xl shadow-2xl backdrop-blur-xl"
                     >
                         {step === 1 && (
                             <div className="space-y-8">
@@ -438,7 +438,7 @@ export default function CreateEventWizard() {
                                         value={formData.title}
                                         onChange={e => updateFormData({ title: e.target.value })}
                                         className={cn(
-                                            "w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-white/[0.08] placeholder:text-zinc-700",
+                                            "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-zinc-950/80 placeholder:text-zinc-700",
                                             errors.title && "border-rose-500/50"
                                         )}
                                     />
@@ -452,7 +452,7 @@ export default function CreateEventWizard() {
                                         placeholder="A short punchy catchphrase..."
                                         value={formData.tagline}
                                         onChange={e => updateFormData({ tagline: e.target.value })}
-                                        className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-white/[0.08] placeholder:text-zinc-700"
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-zinc-900/50 placeholder:text-zinc-700"
                                     />
                                 </div>
 
@@ -464,7 +464,7 @@ export default function CreateEventWizard() {
                                         value={formData.description}
                                         onChange={e => updateFormData({ description: e.target.value })}
                                         className={cn(
-                                            "w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-white/[0.08] placeholder:text-zinc-700 resize-none",
+                                            "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-zinc-900/50 placeholder:text-zinc-700 resize-none",
                                             errors.description && "border-rose-500/50"
                                         )}
                                     />
@@ -479,10 +479,10 @@ export default function CreateEventWizard() {
                                             type="button"
                                             onClick={() => updateFormData({ clubId: "none" })}
                                             className={cn(
-                                                "p-4 rounded-2xl border text-left transition-all relative flex items-center gap-3",
+                                                "p-4 rounded-xl border text-left transition-all relative flex items-center gap-3",
                                                 formData.clubId === "none"
                                                     ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400"
-                                                    : "bg-white/5 border-white/5 text-zinc-500 hover:border-zinc-700 hover:bg-white/[0.02]"
+                                                    : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-950/80"
                                             )}
                                         >
                                             <Building size={14} />
@@ -496,10 +496,10 @@ export default function CreateEventWizard() {
                                                 type="button"
                                                 onClick={() => updateFormData({ clubId: c.id })}
                                                 className={cn(
-                                                    "p-4 rounded-2xl border text-left transition-all relative flex items-center gap-3",
+                                                    "p-4 rounded-xl border text-left transition-all relative flex items-center gap-3",
                                                     formData.clubId === c.id
                                                         ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400"
-                                                        : "bg-white/5 border-white/5 text-zinc-500 hover:border-zinc-700 hover:bg-white/[0.02]"
+                                                        : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-950/80"
                                                 )}
                                             >
                                                 <Users size={14} />
@@ -512,7 +512,7 @@ export default function CreateEventWizard() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <div className="p-5 rounded-2xl bg-zinc-950/50 border border-white/5 flex items-center justify-between">
+                                    <div className="p-5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <LayoutPanelTop size={16} className="text-cyan-400" />
                                             <div>
@@ -532,7 +532,7 @@ export default function CreateEventWizard() {
                                             }}
                                             className={cn(
                                                 "w-11 h-6 rounded-full transition-colors relative",
-                                                formData.isUmbrella ? "bg-cyan-500" : "bg-zinc-800"
+                                                formData.isUmbrella ? "bg-cyan-500" : "bg-zinc-900"
                                             )}
                                         >
                                             <div className={cn(
@@ -544,7 +544,7 @@ export default function CreateEventWizard() {
 
                                     {/* Parent Fest Selection (Only if NOT an umbrella itself) */}
                                     {!formData.isUmbrella && umbrellaEvents.length > 0 && (
-                                        <div className="p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="p-6 rounded-xl bg-blue-500/5 border border-blue-500/10 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <Sparkles size={14} className="text-blue-400" />
                                                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Part of a Larger Fest?</p>
@@ -554,9 +554,9 @@ export default function CreateEventWizard() {
                                                 onChange={e => updateFormData({ parentEventId: e.target.value })}
                                                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-blue-500/50 transition-all appearance-none cursor-pointer"
                                             >
-                                                <option value="" className="bg-zinc-900">Standalone Event (No Parent)</option>
+                                                <option value="" className="bg-[#0c0c14] text-white">Standalone Event (No Parent)</option>
                                                 {umbrellaEvents.map(fest => (
-                                                    <option key={fest.id} value={fest.id} className="bg-zinc-900">
+                                                    <option key={fest.id} value={fest.id} className="bg-[#0c0c14] text-white">
                                                         {fest.title}
                                                     </option>
                                                 ))}
@@ -577,7 +577,7 @@ export default function CreateEventWizard() {
                                             type="datetime-local"
                                             value={formData.startTime}
                                             onChange={e => updateFormData({ startTime: e.target.value })}
-                                            className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium"
+                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -586,7 +586,7 @@ export default function CreateEventWizard() {
                                             type="datetime-local"
                                             value={formData.endTime}
                                             onChange={e => updateFormData({ endTime: e.target.value })}
-                                            className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium"
+                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium"
                                         />
                                     </div>
                                 </div>
@@ -608,10 +608,10 @@ export default function CreateEventWizard() {
                                                         disabled={isBooked || isMaintenance}
                                                         onClick={() => updateFormData({ venueId: v.id })}
                                                         className={cn(
-                                                            "p-5 rounded-2xl border text-left transition-all relative",
+                                                            "p-5 rounded-xl border text-left transition-all relative",
                                                             isSelected
                                                                 ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400"
-                                                                : "bg-white/5 border-white/5 text-zinc-500 hover:border-zinc-700",
+                                                                : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700",
                                                             (isBooked || isMaintenance) && "opacity-50 cursor-not-allowed bg-zinc-900/50"
                                                         )}
                                                     >
@@ -645,8 +645,8 @@ export default function CreateEventWizard() {
                                             })
                                         ) : (
                                             <div className="col-span-1 md:col-span-2 space-y-3">
-                                                <div className="p-8 rounded-2xl border border-zinc-800 bg-zinc-900/40 text-center space-y-4">
-                                                    <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto text-zinc-600">
+                                                <div className="p-8 rounded-xl border border-zinc-800 bg-zinc-950/50 text-center space-y-4">
+                                                    <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-600">
                                                         <MapPin size={24} />
                                                     </div>
                                                     <div>
@@ -660,7 +660,7 @@ export default function CreateEventWizard() {
                                                             "px-6 py-3 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all",
                                                             formData.venueId === "tbd-placeholder"
                                                                 ? "bg-cyan-500/10 border-cyan-500 text-cyan-400"
-                                                                : "bg-white/5 border-white/5 text-zinc-500 hover:border-zinc-700"
+                                                                : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700"
                                                         )}
                                                     >
                                                         Use "To Be Decided"
@@ -674,14 +674,14 @@ export default function CreateEventWizard() {
                                     {/* Smart Conflict Alert System */}
                                     {(conflictStatus.type !== 'NONE' || checkingConflict) && (
                                         <div className={cn(
-                                            "mt-8 p-6 rounded-[2rem] border flex items-center gap-4 transition-all duration-500 animate-in fade-in slide-in-from-top-4",
-                                            checkingConflict ? "bg-zinc-900/50 border-white/5 text-zinc-500" :
+                                            "mt-8 p-6 rounded-xl border flex items-center gap-4 transition-all duration-500 animate-in fade-in slide-in-from-top-4",
+                                            checkingConflict ? "bg-zinc-950 border-zinc-800 text-zinc-500" :
                                                 conflictStatus.type === 'HARD' ? "bg-rose-500/10 border-rose-500/20 text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.1)]" :
                                                     "bg-amber-500/10 border-amber-500/20 text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.1)]"
                                         )}>
                                             <div className={cn(
-                                                "p-3 rounded-2xl",
-                                                checkingConflict ? "bg-zinc-800" :
+                                                "p-3 rounded-xl",
+                                                checkingConflict ? "bg-zinc-900" :
                                                     conflictStatus.type === 'HARD' ? "bg-rose-500/20" : "bg-amber-500/20"
                                             )}>
                                                 {checkingConflict ? <Loader2 size={20} className="animate-spin" /> :
@@ -703,7 +703,7 @@ export default function CreateEventWizard() {
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="mt-6 flex items-center justify-center gap-2 text-emerald-500 py-3 bg-emerald-500/5 rounded-2xl border border-emerald-500/10"
+                                            className="mt-6 flex items-center justify-center gap-2 text-emerald-500 py-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10"
                                         >
                                             <CheckCircle2 size={14} />
                                             <span className="text-[10px] font-black uppercase tracking-[0.2em]">✅ Schedule is clear.</span>
@@ -724,14 +724,14 @@ export default function CreateEventWizard() {
                                                 type="button"
                                                 onClick={() => updateFormData({ riskLevel: card.id })}
                                                 className={cn(
-                                                    "flex items-center gap-4 p-5 rounded-2xl border transition-all",
+                                                    "flex items-center gap-4 p-5 rounded-xl border transition-all",
                                                     formData.riskLevel === card.id
                                                         ? `${card.borderColor} ${card.bgColor} text-white`
-                                                        : "bg-white/5 border-white/5 text-zinc-500"
+                                                        : "bg-zinc-950 border-zinc-800 text-zinc-500"
                                                 )}
                                             >
                                                 <div className={cn(
-                                                    "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+                                                    "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm",
                                                     formData.riskLevel === card.id ? "bg-white text-black" : "bg-zinc-800 text-zinc-600"
                                                 )}>
                                                     <card.icon size={16} />
@@ -755,7 +755,7 @@ export default function CreateEventWizard() {
                                             placeholder="0"
                                             value={formData.budgetRequired}
                                             onChange={e => updateFormData({ budgetRequired: e.target.value })}
-                                            className="w-full bg-white/5 border border-white/5 rounded-2xl pl-12 pr-6 py-4 text-xl font-bold focus:outline-none focus:border-cyan-500 transition-all placeholder:text-zinc-800"
+                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-6 py-4 text-xl font-bold focus:outline-none focus:border-cyan-500 transition-all placeholder:text-zinc-800"
                                         />
                                     </div>
                                 </div>
@@ -782,8 +782,8 @@ export default function CreateEventWizard() {
                                     <ReviewField label="Funds (Gross)" value={formatCurrency(Number(formData.budgetRequired))} icon={<DollarSign size={12} />} />
                                 </div>
 
-                                <div className="p-6 rounded-3xl bg-indigo-600 text-white shadow-xl relative overflow-hidden flex items-center gap-5">
-                                    <div className="p-3 bg-white/10 rounded-2xl">
+                                <div className="p-6 rounded-xl bg-indigo-600 text-white shadow-xl relative overflow-hidden flex items-center gap-5">
+                                    <div className="p-3 bg-white/10 rounded-lg">
                                         <Send size={20} />
                                     </div>
                                     <div>
@@ -799,40 +799,38 @@ export default function CreateEventWizard() {
                 </AnimatePresence>
             </main>
 
-            {/* 3. Refined Footer Bar */}
-            <div className="fixed bottom-0 left-0 right-0 p-6 z-50">
-                <div className="max-w-3xl mx-auto">
-                    <div className="bg-zinc-950/70 backdrop-blur-2xl border border-white/5 rounded-3xl p-3 flex items-center justify-between shadow-2xl">
-                        <Button
-                            variant="ghost"
-                            onClick={handleBack}
-                            disabled={step === 1 || isSubmitting}
+            {/* 3. Refined Footer Bar (Flow integrated) */}
+            <div className="max-w-3xl mx-auto px-6 pb-20 w-full mt-4">
+                <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-center justify-between shadow-2xl">
+                    <Button
+                        variant="ghost"
+                        onClick={handleBack}
+                        disabled={step === 1 || isSubmitting}
+                        className={cn(
+                            "flex items-center gap-2 text-zinc-500 hover:text-white transition-all px-4",
+                            step === 1 && "opacity-0 pointer-events-none"
+                        )}
+                    >
+                        <ChevronLeft size={16} />
+                        <span className="uppercase tracking-widest text-[9px] font-black">Back</span>
+                    </Button>
+
+                    <div className="hidden sm:block">
+                        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-800">CampusBuzz Network</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={step < 4 ? handleNext : handleSubmit}
+                            disabled={isSubmitting || (step === 2 && conflictStatus.type === 'HARD')}
                             className={cn(
-                                "flex items-center gap-2 text-zinc-500 hover:text-white transition-all px-4",
-                                step === 1 && "opacity-0 pointer-events-none"
+                                "h-12 px-8 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:grayscale",
+                                step === 2 && conflictStatus.type === 'HARD' ? "bg-zinc-800 text-zinc-500 cursor-not-allowed" : "bg-white text-black hover:bg-cyan-400"
                             )}
                         >
-                            <ChevronLeft size={16} />
-                            <span className="uppercase tracking-widest text-[9px] font-black">Back</span>
-                        </Button>
-
-                        <div className="hidden sm:block">
-                            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-800">CampusBuzz Network</span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={step < 4 ? handleNext : handleSubmit}
-                                disabled={isSubmitting || (step === 2 && conflictStatus.type === 'HARD')}
-                                className={cn(
-                                    "h-12 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:grayscale",
-                                    step === 2 && conflictStatus.type === 'HARD' ? "bg-zinc-800 text-zinc-500 cursor-not-allowed" : "bg-white text-black hover:bg-cyan-400"
-                                )}
-                            >
-                                {isSubmitting ? <Loader2 size={14} className="animate-spin" /> :
-                                    step < 4 ? <>Next Step <ArrowRight size={14} /></> : <>Dispatch <ArrowRight size={14} /></>}
-                            </button>
-                        </div>
+                            {isSubmitting ? <Loader2 size={14} className="animate-spin" /> :
+                                step < 4 ? <>Next Step <ArrowRight size={14} /></> : <>Dispatch <ArrowRight size={14} /></>}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -855,7 +853,7 @@ function ReviewField({
 }) {
     return (
         <div className={cn(
-            "p-5 bg-zinc-900 border border-white/5 rounded-2xl flex flex-col justify-center space-y-2",
+            "p-5 bg-zinc-950 border border-zinc-800 rounded-xl flex flex-col justify-center space-y-2",
             fullWidth && "md:col-span-2"
         )}>
             <div className="flex items-center gap-2">

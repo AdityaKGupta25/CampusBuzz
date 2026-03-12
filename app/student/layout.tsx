@@ -59,10 +59,10 @@ function Sidebar() {
                     >
                         <div
                             className={cn(
-                                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300",
+                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
                                 active
                                     ? "bg-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.4)]"
-                                    : "bg-white/5 group-hover:bg-white/10"
+                                    : "bg-zinc-900 group-hover:bg-zinc-800"
                             )}
                         >
                             <Icon

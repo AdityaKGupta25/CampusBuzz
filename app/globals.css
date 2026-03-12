@@ -70,3 +70,7 @@ html {
   color: #818cf8 !important;
   font-weight: 900 !important;
 }
+select option {
+  background-color: #0c0c14 !important;
+  color: white !important;
+}

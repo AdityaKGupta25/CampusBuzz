@@ -92,7 +92,7 @@ function StatCard({ icon, label, value, sub, accent, delay = 0, loading }: StatC
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay, duration: 0.4, ease: "easeOut" }}
-            className="relative bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 overflow-hidden group hover:border-zinc-700 transition-all"
+            className="relative bg-zinc-900 rounded-xl border border-zinc-800 p-6 overflow-hidden group hover:border-zinc-700 transition-all font-sans"
         >
             {/* Blue admin glow top-left */}
             <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full blur-2xl opacity-20 pointer-events-none"
@@ -129,7 +129,7 @@ function DeptCard({ dept, index }: { dept: DeptReport; index: number }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 * index, duration: 0.4, ease: "easeOut" }}
-            className="group bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 space-y-4 hover:border-blue-500/30 hover:bg-zinc-900/80 transition-all"
+            className="group bg-zinc-950 border border-zinc-800 rounded-xl p-5 space-y-4 hover:border-blue-500/30 hover:bg-zinc-900 transition-all font-sans"
             style={{ boxShadow: "0 0 0 0 rgba(59,130,246,0)" }}
             onMouseEnter={e => {
                 (e.currentTarget as HTMLElement).style.boxShadow = "0 0 24px rgba(59,130,246,0.06)";
@@ -210,10 +210,10 @@ function DeptCard({ dept, index }: { dept: DeptReport; index: number }) {
 
             {/* CTA */}
             <button
-                onClick={() => router.push(`/faculty/explore?dept=${dept.id}`)}
+                onClick={() => router.push(`/admin/directory?dept=${dept.id}`)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-500 border border-zinc-800 hover:text-blue-400 hover:border-blue-500/30 transition-all group/btn"
             >
-                View Dept Report <ChevronRight size={11} className="group-hover/btn:translate-x-0.5 transition-transform" />
+                View in Directory <ChevronRight size={11} className="group-hover/btn:translate-x-0.5 transition-transform" />
             </button>
         </motion.div>
     );
@@ -228,8 +228,9 @@ function EscalationRow({ event, index }: { event: EscalatedEvent; index: number 
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.06 * index, duration: 0.35 }}
-            className="flex items-center gap-4 p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl hover:border-amber-500/25 hover:bg-zinc-900/70 transition-all group cursor-pointer"
-            onClick={() => router.push(`/faculty/event/${event.id}/manage`)}
+            className="flex items-center gap-4 p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl hover:border-amber-500/25 transition-all group cursor-help"
+            onClick={() => {/* Silo lock: Admin cannot enter Faculty management interface */ }}
+            title="Silo Lock: Admin cannot enter Faculty management interface"
         >
             {/* Risk pill */}
             <span className={cn("shrink-0 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border", riskColor(event.risk_level))}>
@@ -279,7 +280,7 @@ function EmptyState({ onGetStarted }: { onGetStarted: () => void }) {
             >
                 {/* Icon */}
                 <div className="flex justify-center">
-                    <div className="w-24 h-24 rounded-3xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center"
+                    <div className="w-24 h-24 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center"
                         style={{ boxShadow: "0 0 60px rgba(59,130,246,0.15)" }}>
                         <Building2 size={40} className="text-blue-400" />
                     </div>
@@ -306,7 +307,7 @@ function EmptyState({ onGetStarted }: { onGetStarted: () => void }) {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={onGetStarted}
-                    className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl text-white font-bold text-sm"
+                    className="w-full flex items-center justify-center gap-3 py-4 rounded-xl text-white font-bold text-sm"
                     style={{
                         background: "linear-gradient(135deg, #3b82f6, #6366f1)",
                         boxShadow: "0 16px 40px rgba(59,130,246,0.25)",
@@ -605,23 +606,17 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* ── Secondary alert pills ── */}
-                {stats && (
+                {stats && stats.escalatedCount > 0 && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.3 }}
                         className="flex flex-wrap gap-3"
                     >
-                        {[
-                            { icon: <Activity size={11} />, label: `${stats.pendingApprovals} Pending Approvals`, color: "text-amber-400 bg-amber-500/8 border-amber-500/20", href: "/faculty/my-events" },
-                            { icon: <AlertTriangle size={11} />, label: `${stats.highRiskEvents} High-Risk Events`, color: "text-rose-400 bg-rose-500/8 border-rose-500/20", href: "/faculty/explore" },
-                            { icon: <Gavel size={11} />, label: `${stats.escalatedCount} Sovereign Escalations`, color: "text-orange-400 bg-orange-500/8 border-orange-500/20", href: "#sovereign" },
-                        ].map(({ icon, label, color, href }) => (
-                            <a key={label} href={href}
-                                className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold cursor-pointer hover:opacity-80 transition-all", color)}>
-                                {icon} {label}
-                            </a>
-                        ))}
+                        <a href="#sovereign"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full border text-[10px] font-bold cursor-pointer hover:opacity-80 transition-all text-orange-400 bg-orange-500/8 border-orange-500/20 shadow-lg shadow-orange-500/5">
+                            <Gavel size={11} /> {stats.escalatedCount} Sovereign Escalations Required
+                        </a>
                     </motion.div>
                 )}
 
@@ -646,11 +641,11 @@ export default function AdminDashboardPage() {
                     {loading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             {Array.from({ length: 8 }).map((_, i) => (
-                                <Skeleton key={i} className="h-52" />
+                                <Skeleton key={i} className="h-52 rounded-xl" />
                             ))}
                         </div>
                     ) : depts.length === 0 ? (
-                        <div className="h-40 border border-dashed border-zinc-800 rounded-2xl flex items-center justify-center">
+                        <div className="h-40 border border-dashed border-zinc-800 rounded-xl flex items-center justify-center">
                             <p className="text-xs text-zinc-700">No departments found</p>
                         </div>
                     ) : (
@@ -686,8 +681,8 @@ export default function AdminDashboardPage() {
 
                     {/* Escalation strip border glow */}
                     <div
-                        className="rounded-2xl border overflow-hidden"
-                        style={{ borderColor: escalated.length > 0 ? "rgba(251,146,60,0.2)" : "rgba(63,63,70,1)" }}
+                        className="rounded-xl border border-zinc-800 overflow-hidden bg-zinc-950"
+                        style={{ borderColor: escalated.length > 0 ? "rgba(251,146,60,0.2)" : "" }}
                     >
                         {loading ? (
                             <div className="p-6 space-y-3">
@@ -695,7 +690,7 @@ export default function AdminDashboardPage() {
                             </div>
                         ) : escalated.length === 0 ? (
                             <div className="flex flex-col items-center justify-center gap-3 py-14">
-                                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                                     <CheckCircle2 size={22} className="text-emerald-400" />
                                 </div>
                                 <div className="text-center">
@@ -754,7 +749,7 @@ export default function AdminDashboardPage() {
                             transition={{ delay: 0.4 }}
                             onClick={() => router.push(href)}
                             className={cn(
-                                "text-left p-5 bg-zinc-900/40 border border-zinc-800 rounded-2xl transition-all group",
+                                "text-left p-5 bg-zinc-900 border border-zinc-800 rounded-xl transition-all group",
                                 accent
                             )}
                         >

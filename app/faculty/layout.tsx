@@ -50,8 +50,7 @@ const ADMIN_LINKS: NavLink[] = [
 ];
 
 function getNavLinks(role: AppRole | undefined): NavLink[] {
-    if (role === "admin") return ADMIN_LINKS;
-    return FACULTY_LINKS; // faculty + fallback
+    return FACULTY_LINKS; // faculty only
 }
 
 // ─── Portal brand config per role ────────────────────────────────────────────
@@ -110,7 +109,7 @@ function Sidebar({
     return (
         <aside
             className={cn(
-                "hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-300 ease-in-out z-40",
+                "hidden md:flex flex-col flex-shrink-0 h-screen sticky top-0 transition-all duration-300 ease-in-out z-[100]",
                 collapsed ? "w-[68px]" : "w-[220px]"
             )}
             style={{ background: "#0c0c14", borderRight: "1px solid rgba(255,255,255,0.07)" }}
@@ -118,7 +117,7 @@ function Sidebar({
             {/* Brand */}
             <div className="flex flex-col px-4 pt-6 pb-2 flex-shrink-0"
                 style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                <Link href={isAdmin ? "/admin/dashboard" : "/faculty/my-events"} className="flex flex-col gap-0 group items-center">
+                <Link href="/faculty/my-events" className="flex flex-col gap-0 group items-center">
                     <div className={cn(
                         "relative transition-all duration-300 ease-in-out overflow-visible flex items-center bg-transparent",
                         collapsed ? "w-8 h-8" : "w-[160px] h-16"
@@ -146,21 +145,12 @@ function Sidebar({
                     {!collapsed && (
                         <div className="animate-in fade-in slide-in-from-left-2 duration-500 w-full text-center -mt-1">
                             <span className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-500/80">
-                                {isAdmin ? "Admin Command" : "Faculty Portal"}
+                                Faculty Portal
                             </span>
                         </div>
                     )}
                 </Link>
             </div>
-
-            {/* Admin badge strip */}
-            {isAdmin && !collapsed && (
-                <div className="mx-3 mt-3 px-3 py-1.5 rounded-lg flex items-center gap-2"
-                    style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)" }}>
-                    <Shield size={10} className="text-rose-500 shrink-0" />
-                    <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Super Admin</span>
-                </div>
-            )}
 
             {/* Nav */}
             <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
@@ -230,15 +220,15 @@ function Sidebar({
             <button
                 id="sidebar-collapse-btn"
                 onClick={onToggle}
-                className="absolute -right-3 top-[72px] w-6 h-6 rounded-full flex items-center justify-center z-50 hover:scale-110 transition-transform"
+                className="absolute -right-3.5 top-[72px] w-7 h-7 rounded-full flex items-center justify-center z-[110] hover:scale-110 transition-transform shadow-2xl"
                 style={{
                     background: "#1a1a2e",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    color: "rgba(255,255,255,0.5)",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    color: "rgba(255,255,255,1)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.8)",
                 }}
             >
-                {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+                {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
         </aside>
     );
@@ -437,6 +427,14 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
         const saved = localStorage.getItem("cb_sidebar_collapsed");
         if (saved === "1") setCollapsed(true);
     }, []);
+
+    useEffect(() => {
+        if (!user && !localStorage.getItem("supabase.auth.token")) return; // Wait for hydration
+        if (user && user.role !== "faculty" && user.role !== "admin") {
+            // Strict silo: if you aren't faculty, you don't belong here
+            router.replace(`/${user.role}/dashboard`);
+        }
+    }, [user, router]);
 
     function toggleCollapse() {
         setCollapsed((v) => {

@@ -117,14 +117,14 @@ function formatShorthand(n: number, isCurrency = false): string {
 
 function StatCard({ label, value, subtext, icon: Icon, iconBg, iconColor, trend }: StatCardProps) {
     return (
-        <div className="bg-white/5 rounded-3xl border border-white/10 p-6 transition-all duration-300 hover:border-cyan-500/20 group">
+        <div className="bg-zinc-900/40 rounded-xl border border-zinc-800 p-6 transition-all duration-300 hover:border-cyan-500/20 group">
             <div className="flex items-start justify-between">
                 <div>
                     <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">{label}</p>
                     <p className="text-3xl font-bold text-white mt-2 tracking-tight">{value}</p>
                     <p className="text-xs text-white/20 mt-1 font-medium">{subtext}</p>
                 </div>
-                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110", iconBg)}>
+                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110", iconBg)}>
                     <Icon size={24} className={iconColor} />
                 </div>
             </div>
@@ -184,7 +184,7 @@ function EventCard({
         <div
             onClick={() => onView(event)}
             className={cn(
-                "group relative bg-zinc-900/40 border border-white/5 rounded-3xl overflow-hidden hover:border-indigo-500/50 hover:bg-zinc-900/60 transition-all duration-500 cursor-pointer flex flex-col h-full",
+                "group relative bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-500/50 hover:bg-zinc-900/60 transition-all duration-500 cursor-pointer flex flex-col h-full",
                 event.isFeatured && "ring-2 ring-indigo-500/30 border-indigo-500/30 bg-indigo-500/5",
                 isSettled && "opacity-80 hover:opacity-100"
             )}
@@ -199,7 +199,7 @@ function EventCard({
                 <div className="flex items-start justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <div className={cn(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center border transition-all duration-500 group-hover:scale-110",
+                            "w-12 h-12 rounded-xl flex items-center justify-center border transition-all duration-500 group-hover:scale-110",
                             getStatusStyle(event.status as any)
                         )}>
                             {getStatusIcon(event.status as any)}
@@ -227,10 +227,10 @@ function EventCard({
                         onClick={handleFeatureClick}
                         disabled={isFeaturing}
                         className={cn(
-                            "shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all",
+                            "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all",
                             event.isFeatured
                                 ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 border-indigo-400"
-                                : "bg-white/5 text-white/20 hover:text-white hover:bg-white/10 border border-white/10",
+                                : "bg-zinc-900 text-white/20 hover:text-white hover:bg-zinc-800 border border-zinc-800",
                             isFeaturing && "animate-pulse"
                         )}
                         title={event.isFeatured ? "Remove from Billboard" : "Feature on Billboard"}
@@ -249,9 +249,9 @@ function EventCard({
                 </p>
 
                 {/* Meta grid */}
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-5 pt-5 border-t border-white/5">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-5 pt-5 border-t border-zinc-800">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 border border-white/5">
+                        <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center flex-shrink-0 border border-zinc-800">
                             <User size={14} className="text-white/30" />
                         </div>
                         <div className="min-w-0">
@@ -261,7 +261,7 @@ function EventCard({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 border border-white/5">
+                        <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center flex-shrink-0 border border-zinc-800">
                             <CalendarDays size={14} className="text-white/30" />
                         </div>
                         <div className="min-w-0">
@@ -271,7 +271,7 @@ function EventCard({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 border border-white/5">
+                        <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center flex-shrink-0 border border-zinc-800">
                             <IndianRupee size={14} className="text-white/30" />
                         </div>
                         <div className="min-w-0">
@@ -287,7 +287,7 @@ function EventCard({
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 border border-white/5">
+                        <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center flex-shrink-0 border border-zinc-800">
                             <Building2 size={14} className="text-white/30" />
                         </div>
                         <div className="min-w-0">
@@ -299,7 +299,7 @@ function EventCard({
 
                 {/* archive_requested status indicator */}
                 {event.status === "completed" && event.archiveRequested && (
-                    <div className="mt-6 px-4 py-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center gap-3">
+                    <div className="mt-6 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center gap-3">
                         <BellRing size={16} className="text-orange-400" />
                         <span className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em]">Archive Requested</span>
                     </div>
@@ -308,7 +308,7 @@ function EventCard({
                 {/* HOD Feedback Note on Card */}
                 {isSettled && (event.governanceNote || event.rejectionReason) && (
                     <div className={cn(
-                        "mt-6 p-4 rounded-2xl border border-dashed text-[11px] leading-relaxed",
+                        "mt-6 p-4 rounded-xl border border-dashed text-[11px] leading-relaxed",
                         event.status === 'rejected' ? "bg-red-500/5 border-red-500/10 text-red-300/70" : "bg-amber-500/5 border-amber-500/10 text-amber-300/70"
                     )}>
                         <div className="flex items-center justify-between mb-2">
@@ -328,7 +328,7 @@ function EventCard({
             </div>
 
             {/* Submitted timestamp */}
-            <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
+            <div className="px-6 py-4 bg-zinc-950/50 border-t border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Clock size={12} className="text-white/20" />
                     <span className="text-[10px] text-white/30 font-bold uppercase tracking-widest">
@@ -344,7 +344,7 @@ function EventCard({
             </div>
 
             {/* Action buttons */}
-            <div className="p-4 bg-white/5 border-t border-white/5">
+            <div className="p-4 bg-zinc-950 border-t border-zinc-800">
                 {event.status === "pending" ? (
                     <button
                         id={`review-btn-${event.id}`}
@@ -353,7 +353,7 @@ function EventCard({
                             onView(event);
                         }}
                         className={cn(
-                            "w-full flex items-center justify-center gap-2 h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-[0.98]",
+                            "w-full flex items-center justify-center gap-2 h-12 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-[0.98]",
                             "bg-indigo-600 text-white hover:bg-indigo-500 shadow-xl shadow-indigo-900/40 border border-indigo-400/50"
                         )}
                     >
@@ -369,9 +369,9 @@ function EventCard({
                         }}
                         disabled={event.archiveRequested}
                         className={cn(
-                            "w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-[0.98]",
+                            "w-full h-12 rounded-xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-[0.98]",
                             event.archiveRequested
-                                ? "bg-white/5 text-white/20 border border-white/10 cursor-not-allowed"
+                                ? "bg-zinc-900 text-white/20 border border-zinc-800 cursor-not-allowed"
                                 : "bg-orange-500 text-black hover:bg-orange-400 shadow-orange-900/40"
                         )}
                     >
@@ -388,7 +388,7 @@ function EventCard({
                             onView(event);
                         }}
                         className={cn(
-                            "w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all active:scale-[0.98]",
+                            "w-full h-12 rounded-xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all active:scale-[0.98]",
                             (event.status === "approved" || event.status === "live" || event.status === "completed" || event.status === "archived")
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-black"
                                 : "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500 hover:text-white"
@@ -416,7 +416,7 @@ function getStatusStyle(status: EventStatus) {
         case "completed":
         case "archived": return "bg-indigo-500/10 border-indigo-500/20 text-indigo-500";
         case "rejected": return "bg-red-500/10 border-red-500/20 text-red-500";
-        default: return "bg-white/5 border-white/10 text-white/40";
+        default: return "bg-zinc-900 border-zinc-800 text-white/40";
     }
 }
 
@@ -673,9 +673,9 @@ export default function HodDashboardPage() {
     const modalEvent = modal ? events.find((e) => e.id === modal.eventId) : null;
 
     return (
-        <main className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#09090f] font-sans">
+        <main className="flex-1 flex flex-col min-w-0 min-h-screen bg-zinc-950 font-sans">
             {/* Top bar */}
-            <header className="h-16 bg-white/5 border-b border-white/10 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-30">
+            <header className="h-16 bg-zinc-950/80 border-b border-zinc-800 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-30">
                 <div className="flex items-center gap-8">
                     <div>
                         <h1 className="text-base font-bold text-white tracking-tight">Governance Dashboard</h1>
@@ -684,9 +684,9 @@ export default function HodDashboardPage() {
                         </p>
                     </div>
 
-                    <div className="h-8 w-px bg-white/10 hidden sm:block" />
+                    <div className="h-8 w-px bg-zinc-800 hidden sm:block" />
 
-                    <nav className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit border border-white/5" aria-label="Dashboard views">
+                    <nav className="flex gap-1 bg-zinc-900/40 p-1 rounded-xl w-fit border border-zinc-800" aria-label="Dashboard views">
                         <button
                             id="nav-approvals"
                             onClick={() => setActiveNav("approvals")}
@@ -795,7 +795,7 @@ export default function HodDashboardPage() {
 
                 {/* ── Vault Sub-Filters ── */}
                 {activeNav === "archive" && (
-                    <div className="flex items-center gap-2 p-1.5 bg-white/5 rounded-xl border border-white/5 w-fit overflow-x-auto no-scrollbar max-w-full">
+                    <div className="flex items-center gap-2 p-1.5 bg-zinc-900/40 rounded-xl border border-zinc-800 w-fit overflow-x-auto no-scrollbar max-w-full">
                         <History size={14} className="ml-2 text-white/20 flex-shrink-0" />
                         {(["all", "approved", "revision", "completed", "archived", "rejected"] as const).map((vf) => (
                             <button
@@ -804,8 +804,8 @@ export default function HodDashboardPage() {
                                 className={cn(
                                     "px-4 h-8 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
                                     vaultFilter === vf
-                                        ? "bg-white/10 text-white border border-white/10"
-                                        : "text-white/30 hover:text-white hover:bg-white/5"
+                                        ? "bg-zinc-800 text-white border border-zinc-700"
+                                        : "text-white/30 hover:text-white hover:bg-zinc-900/60"
                                 )}
                             >
                                 {vf === "revision" ? "In Revision" : vf}
@@ -815,7 +815,7 @@ export default function HodDashboardPage() {
                 )}
 
                 {/* ── Toolbar ── */}
-                <section className="flex flex-col sm:flex-row items-center gap-4 bg-white/5 border border-white/10 p-2 rounded-2xl">
+                <section className="flex flex-col sm:flex-row items-center gap-4 bg-zinc-900/40 border border-zinc-800 p-2 rounded-xl">
                     <div className="relative flex-1 group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-cyan-400 transition-colors" size={18} />
                         <input
@@ -824,11 +824,11 @@ export default function HodDashboardPage() {
                             placeholder="Search events or faculty…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full bg-white/5 border border-white/5 rounded-xl h-12 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl h-12 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
                         />
                     </div>
 
-                    <div className="flex items-center gap-2 p-1.5 bg-white/5 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-2 p-1.5 bg-zinc-900/40 rounded-xl border border-zinc-800">
                         <Filter size={14} className="ml-2 text-white/20" />
                         {(["all", "low", "medium", "high"] as const).map((r) => (
                             <button
@@ -839,7 +839,7 @@ export default function HodDashboardPage() {
                                     "px-4 h-9 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
                                     filterRisk === r
                                         ? "bg-cyan-500 text-white shadow-lg shadow-cyan-900/40"
-                                        : "text-white/30 hover:text-white hover:bg-white/5"
+                                        : "text-white/30 hover:text-white hover:bg-zinc-900/60"
                                 )}
                             >
                                 {r}
@@ -875,18 +875,18 @@ export default function HodDashboardPage() {
                             {[1, 2, 3].map((i) => (
                                 <div
                                     key={i}
-                                    className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm animate-pulse"
+                                    className="bg-zinc-900/40 rounded-xl border border-zinc-800 p-5 shadow-sm animate-pulse"
                                 >
-                                    <div className="h-4 bg-slate-100 rounded-full w-3/4 mb-3" />
-                                    <div className="h-3 bg-slate-100 rounded-full w-1/2 mb-6" />
+                                    <div className="h-4 bg-zinc-800 rounded-full w-3/4 mb-3" />
+                                    <div className="h-3 bg-zinc-800 rounded-full w-1/2 mb-6" />
                                     <div className="grid grid-cols-2 gap-3">
                                         {[1, 2, 3, 4].map((j) => (
-                                            <div key={j} className="h-8 bg-slate-100 rounded-lg" />
+                                            <div key={j} className="h-8 bg-zinc-800 rounded-lg" />
                                         ))}
                                     </div>
                                     <div className="mt-4 grid grid-cols-2 gap-3">
-                                        <div className="h-10 bg-slate-100 rounded-xl" />
-                                        <div className="h-10 bg-emerald-100 rounded-xl" />
+                                        <div className="h-10 bg-zinc-800 rounded-xl" />
+                                        <div className="h-10 bg-emerald-900/20 rounded-xl" />
                                     </div>
                                 </div>
                             ))}
@@ -895,8 +895,8 @@ export default function HodDashboardPage() {
 
                     {/* Empty states */}
                     {!isLoading && events.length === 0 && !fetchError && (
-                        <div className="bg-white/5 border-2 border-dashed border-white/10 rounded-3xl p-16 text-center group">
-                            <div className="w-16 h-16 rounded-full bg-white/5 mx-auto mb-6 flex items-center justify-center transition-transform group-hover:scale-110">
+                        <div className="bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl p-16 text-center group">
+                            <div className="w-16 h-16 rounded-full bg-zinc-950 mx-auto mb-6 flex items-center justify-center transition-transform group-hover:scale-110">
                                 <CheckCircle2 size={32} className="text-cyan-500 opacity-20" />
                             </div>
                             <h3 className="text-lg font-bold text-white mb-2">All caught up!</h3>
@@ -908,7 +908,7 @@ export default function HodDashboardPage() {
                             <button
                                 id="refresh-empty"
                                 onClick={() => void loadEvents()}
-                                className="mt-8 mx-auto flex items-center gap-2 px-6 h-11 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white uppercase tracking-widest hover:bg-white/10 transition-all"
+                                className="mt-8 mx-auto flex items-center gap-2 px-6 h-11 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black text-white uppercase tracking-widest hover:bg-zinc-900 transition-all"
                             >
                                 <RefreshCw size={14} /> Check Again
                             </button>
@@ -916,8 +916,8 @@ export default function HodDashboardPage() {
                     )}
 
                     {!isLoading && events.length > 0 && filtered.length === 0 && (
-                        <div className="bg-white/5 border-2 border-dashed border-white/10 rounded-3xl p-16 text-center">
-                            <div className="w-16 h-16 rounded-full bg-white/5 mx-auto mb-6 flex items-center justify-center">
+                        <div className="bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl p-16 text-center">
+                            <div className="w-16 h-16 rounded-full bg-zinc-950 mx-auto mb-6 flex items-center justify-center">
                                 <SearchIcon size={32} className="text-white/10" />
                             </div>
                             <p className="text-lg font-bold text-white">No results found</p>
@@ -927,7 +927,7 @@ export default function HodDashboardPage() {
                             <button
                                 id="clear-filters"
                                 onClick={() => { setSearch(""); setFilterRisk("all"); }}
-                                className="mt-8 mx-auto flex items-center gap-2 px-6 h-11 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white uppercase tracking-widest hover:bg-white/10 transition-all font-bold"
+                                className="mt-8 mx-auto flex items-center gap-2 px-6 h-11 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-black text-white uppercase tracking-widest hover:bg-zinc-900 transition-all font-bold"
                             >
                                 Clear all filters
                             </button>
