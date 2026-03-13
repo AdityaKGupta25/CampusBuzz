@@ -110,6 +110,11 @@ function LoginForm() {
             // Ensure session is persisted to cookies before redirecting
             await supabase.auth.getSession();
 
+            // ── Clear any stale role cookie ──
+            // This forces the middleware to re-resolve the role from the DB 
+            // on the first request to the dashboard.
+            document.cookie = "cb_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
             // Give the cookie listener a moment to write to the browser
             await new Promise((resolve) => setTimeout(resolve, 500));
 

@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/context/UserContext";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 // ─── Founder gate ─────────────────────────────────────────────────────────────
@@ -107,6 +108,7 @@ function InitModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (in
     const [name, setName] = useState("");
     const [emailDomain, setEmailDomain] = useState("");
     const [adminEmail, setAdminEmail] = useState("");
+    const [adminPassword, setAdminPassword] = useState("");
     const [campusCode, setCampusCode] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -128,13 +130,14 @@ function InitModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (in
                     name,
                     email_domain: emailDomain,
                     admin_email: adminEmail,
+                    admin_password: adminPassword,
                     campus_code: campusCode,
                 }),
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error ?? "Failed");
             setDone(true);
-            setTimeout(() => onSuccess(json.institution), 1400);
+            // Don't close immediately — show the jump-in UI
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -169,14 +172,40 @@ function InitModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (in
                 </div>
 
                 {done ? (
-                    <div className="flex flex-col items-center gap-4 py-14 px-6">
-                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", damping: 10 }}
-                            className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                            style={{ background: "rgba(212,175,55,0.1)", border: `1px solid ${GOLD.border}` }}>
-                            <Check size={28} style={{ color: GOLD.text }} />
+                    <div className="flex flex-col items-center gap-6 py-12 px-8 text-center">
+                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", damping: 12 }}
+                            className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-2xl"
+                            style={{ background: "rgba(16,185,129,0.1)", border: `1px solid rgba(16,185,129,0.2)` }}>
+                            <Check size={40} className="text-emerald-400" strokeWidth={3} />
                         </motion.div>
-                        <p className="text-white font-bold">College Initialized!</p>
-                        <p className="text-xs text-zinc-600">Welcome dispatch logged. Closing…</p>
+                        
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-black text-white tracking-tight">{name} is Live!</h3>
+                            <p className="text-xs text-zinc-500 max-w-[240px] leading-relaxed mx-auto">
+                                The institution record has been created and the administrator account is now active.
+                            </p>
+                        </div>
+
+                        <div className="w-full flex flex-col gap-3 pt-4">
+                            <Link 
+                                href={`/login?email=${encodeURIComponent(adminEmail)}`}
+                                target="_blank"
+                                className="w-full h-12 rounded-2xl text-sm font-bold text-black flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-95"
+                                style={{ background: GOLD.gradient, boxShadow: `0 8px 32px ${GOLD.glowStrong}` }}
+                            >
+                                <ExternalLink size={16} /> Open Admin Portal
+                            </Link>
+                            
+                            <button 
+                                onClick={() => {
+                                    onSuccess({ name, admin_email: adminEmail } as any);
+                                    onClose();
+                                }}
+                                className="w-full h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+                            >
+                                Done, Return to Console
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <form onSubmit={(e) => void handleSubmit(e)} className="p-6 space-y-5">
@@ -249,6 +278,24 @@ function InitModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (in
                             </div>
                         </div>
 
+                        {/* Admin Password */}
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Initial Admin Password</label>
+                            <div className="relative">
+                                <Settings size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
+                                <input required type="text" value={adminPassword} onChange={e => setAdminPassword(e.target.value)}
+                                    placeholder="e.g. CampusBuzz@2026"
+                                    className="w-full h-11 pl-10 pr-4 rounded-xl text-sm text-white placeholder:text-zinc-700 outline-none transition-all font-mono"
+                                    style={{ background: "#111", border: `1px solid rgba(212,175,55,0.2)` }}
+                                    onFocus={e => (e.target.style.borderColor = GOLD.borderStrong)}
+                                    onBlur={e => (e.target.style.borderColor = "rgba(212,175,55,0.2)")}
+                                />
+                            </div>
+                            <p className="text-[10px] text-zinc-600 pl-1">
+                                Provide this to the admin. They can change it later from their dashboard.
+                            </p>
+                        </div>
+
                         {/* Status indicator */}
                         <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
                             style={{ background: "rgba(212,175,55,0.05)", border: `1px solid ${GOLD.border}` }}>
@@ -271,12 +318,114 @@ function InitModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (in
     );
 }
 
+// ─── Delete Institution Modal (Danger Zone) ───────────────────────────────
+function DeleteInstitutionModal({ 
+    inst, 
+    onClose, 
+    onConfirm 
+}: { 
+    inst: Institution; 
+    onClose: () => void; 
+    onConfirm: (id: string) => Promise<{ success: boolean; error?: string }> 
+}) {
+    const [confirmText, setConfirmText] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [localError, setLocalError] = useState<string | null>(null);
+
+    async function handlePurge() {
+        if (confirmText !== "DELETE") return;
+        setLoading(true);
+        setLocalError(null);
+        try {
+            const res = await onConfirm(inst.id);
+            if (res.success) {
+                onClose();
+            } else {
+                setLocalError(res.error || "Nuclear launch failure.");
+            }
+        } catch (err: any) {
+            setLocalError(err.message || "Protocol violation.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+            <motion.div
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-md rounded-[2.5rem] overflow-hidden border border-red-500/30 bg-zinc-950 shadow-[0_0_100px_rgba(239,68,68,0.15)]"
+            >
+                <div className="p-8 space-y-6">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                        <div className="w-16 h-16 rounded-3xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                            <AlertTriangle size={32} className="text-red-500" />
+                        </div>
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-black text-white tracking-tight">Delete {inst.name}?</h2>
+                            <p className="text-xs text-zinc-500 leading-relaxed">
+                                <span className="text-red-400 font-bold uppercase tracking-widest block mb-2">Warning: Nuclear Option</span>
+                                This action is permanent. It will instantly delete all Departments, Faculty, Students, Events, and Records associated with this institution.
+                            </p>
+                        </div>
+                    </div>
+
+                    {localError && (
+                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                            className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
+                            <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-red-100 font-mono leading-relaxed">{localError}</p>
+                        </motion.div>
+                    )}
+
+                    <div className="space-y-3">
+                        <p className="text-[10px] text-center font-black uppercase tracking-[0.2em] text-zinc-600">
+                            Type <span className="text-red-500">DELETE</span> to confirm
+                        </p>
+                        <input
+                            type="text"
+                            value={confirmText}
+                            onChange={(e) => setConfirmText(e.target.value)}
+                            placeholder="Type DELETE here..."
+                            className="w-full h-14 bg-red-500/5 border border-red-500/20 rounded-2xl px-6 text-center text-white placeholder:text-zinc-800 focus:outline-none focus:border-red-500/50 transition-all font-black tracking-widest selection:bg-red-500/30"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={handlePurge}
+                            disabled={confirmText !== "DELETE" || loading}
+                            className="w-full h-14 rounded-2xl bg-red-600 text-white text-sm font-black uppercase tracking-widest hover:bg-red-500 transition-all active:scale-95 disabled:opacity-20 disabled:grayscale disabled:pointer-events-none flex items-center justify-center gap-3"
+                        >
+                            {loading ? (
+                                <><Loader2 size={20} className="animate-spin" /> Nuking in progress...</>
+                            ) : (
+                                <><Trash2 size={18} /> Purge Everything</>
+                            )}
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="w-full h-10 text-[10px] font-black uppercase tracking-widest text-zinc-600 hover:text-white transition-colors"
+                        >
+                            Cancel and Return
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
 // ─── College Table Row ────────────────────────────────────────────────────────
 function CollegeRow({ inst, index, onToggle, onDelete }: {
     inst: Institution;
     index: number;
     onToggle: (id: string, newState: boolean) => void;
-    onDelete: (id: string) => void;
+    onDelete: (inst: Institution) => void;
 }) {
     const router = useRouter();
     const [copied, setCopied] = useState(false);
@@ -380,33 +529,35 @@ function CollegeRow({ inst, index, onToggle, onDelete }: {
 
             {/* Actions */}
             <td className="px-5 py-4">
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                    {/* Login as Admin — single domain model */}
+                <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Link
+                        href={`/login?email=${encodeURIComponent(inst.admin_email)}&clear=1`}
+                        target="_blank"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-all bg-white/5 border border-white/5 hover:border-zinc-700"
+                    >
+                        <ExternalLink size={12} /> Admin Portal
+                    </Link>
+                    
+                    {/* Suspend / Reactivate */}
                     <button
-                        onClick={() => router.push(`/login?institution_id=${inst.id}&hint=${encodeURIComponent(inst.admin_email)}`)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
-                        style={{ background: "rgba(212,175,55,0.1)", border: `1px solid ${GOLD.border}`, color: GOLD.text }}
-                        title={`Login as admin for ${inst.name}`}>
-                        <ExternalLink size={10} /> Admin Login
-                    </button>
-
-                    {/* Suspend / Activate */}
-                    <button onClick={() => void handleToggle()} disabled={toggling}
+                        onClick={() => void handleToggle()}
+                        disabled={toggling}
                         className={cn(
-                            "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all disabled:opacity-40",
-                            isActive
-                                ? "text-red-400 bg-red-500/8 border-red-500/20 hover:bg-red-500/15"
-                                : "text-emerald-400 bg-emerald-500/8 border-emerald-500/20 hover:bg-emerald-500/15"
-                        )}>
-                        {toggling ? <Loader2 size={10} className="animate-spin" /> : isActive ? <><Ban size={10} /> Suspend</> : <><Play size={10} /> Activate</>}
+                            "p-2 rounded-lg transition-all",
+                            isActive ? "text-amber-500/60 hover:text-amber-400 hover:bg-amber-400/10" : "text-emerald-500/60 hover:text-emerald-400 hover:bg-emerald-400/10"
+                        )}
+                        title={isActive ? "Suspend College" : "Reactivate College"}
+                    >
+                        {toggling ? <Loader2 size={14} className="animate-spin" /> : (isActive ? <Ban size={14} /> : <Play size={14} />)}
                     </button>
-
+                    
                     {/* Delete */}
                     <button
-                        onClick={() => { if (confirm(`Permanently delete "${inst.name}"? This action is irreversible.`)) onDelete(inst.id); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-700 hover:text-red-400 hover:bg-red-500/8 border border-transparent hover:border-red-500/20 transition-all"
-                        title="Delete forever">
-                        <Trash2 size={12} />
+                        onClick={() => onDelete(inst)}
+                        className="p-2 rounded-lg text-zinc-700 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                        title="Delete forever"
+                    >
+                        <Trash2 size={14} />
                     </button>
                 </div>
             </td>
@@ -450,9 +601,16 @@ export default function FounderConsolePage() {
     const [stats, setStats] = useState<PlatformStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [deletingInst, setDeletingInst] = useState<Institution | null>(null);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
     const isFounder = user?.email?.toLowerCase() === FOUNDER_EMAIL.toLowerCase();
+
+    const showMessage = (msg: string, type: "success" | "error" = "success") => {
+        setToast({ message: msg, type });
+        setTimeout(() => setToast(null), 4000);
+    };
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -480,15 +638,37 @@ export default function FounderConsolePage() {
     }, [userLoading, isFounder, loadData]);
 
     async function handleDelete(id: string) {
+        console.log("🔥 Escalating Purge Protocol for ID:", id);
         try {
             const token = await getBearerToken();
-            await fetch(`/api/founder/institutions?id=${id}`, {
+            
+            // ── Call Secure Founder API (Service Role Bypass) ──
+            const res = await fetch(`/api/founder/institutions?id=${id}`, {
                 method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { 
+                    "Authorization": `Bearer ${token}` 
+                },
             });
+            
+            const json = await res.json();
+            console.log("Purge escalation response:", { status: res.status, json });
+
+            if (!res.ok) {
+                const errorMessage = json.error || `Protocol Error: ${res.status}`;
+                console.error("Purge Escalation Failed:", errorMessage);
+                return { success: false, error: errorMessage };
+            }
+
+            // Success: Clean local state
             setInstitutions(prev => prev.filter(i => i.id !== id));
             if (stats) setStats(prev => prev ? { ...prev, total_institutions: prev.total_institutions - 1 } : null);
-        } catch { /* ignore */ }
+            
+            showMessage("Institution and all its data purged successfully.");
+            return { success: true };
+        } catch (err: any) {
+            console.error("Critical System failure during purge escalation:", err);
+            return { success: false, error: err.message || "Unknown error" };
+        }
     }
 
     function handleToggle(id: string, newState: boolean) {
@@ -662,7 +842,7 @@ export default function FounderConsolePage() {
                                                     inst={inst}
                                                     index={i}
                                                     onToggle={handleToggle}
-                                                    onDelete={handleDelete}
+                                                    onDelete={setDeletingInst}
                                                 />
                                             ))}
                                         </tbody>
@@ -689,9 +869,44 @@ export default function FounderConsolePage() {
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* Modals */}
             <AnimatePresence>
                 {showModal && <InitModal onClose={() => setShowModal(false)} onSuccess={handleAdded} />}
+                {deletingInst && (
+                    <DeleteInstitutionModal 
+                        inst={deletingInst} 
+                        onClose={() => setDeletingInst(null)} 
+                        onConfirm={handleDelete} 
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Toast Notification */}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100]"
+                    >
+                        <div className={cn(
+                            "px-6 py-3.5 rounded-2xl flex items-center gap-3 shadow-2xl backdrop-blur-xl border",
+                            toast.type === "success" 
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                                : "bg-red-500/10 border-red-500/20 text-red-400"
+                        )}>
+                            <div className={cn(
+                                "w-2 h-2 rounded-full animate-pulse",
+                                toast.type === "success" ? "bg-emerald-400" : "bg-red-400"
+                            )} />
+                            <p className="text-xs font-black uppercase tracking-widest">{toast.message}</p>
+                            <button onClick={() => setToast(null)} className="ml-2 hover:opacity-50 transition-opacity">
+                                <X size={14} />
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
             </AnimatePresence>
         </>
     );

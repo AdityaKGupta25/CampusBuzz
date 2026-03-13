@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { Input, Textarea, Select } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import { formatDateTime, formatCurrency } from "@/lib/utils";
 import { supabase, insertEvent, getCurrentUserProfile } from "@/lib/supabase";
@@ -462,43 +463,33 @@ export default function CreateEventWizard() {
                             <div className="space-y-8">
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Event Name</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter event title..."
+                                    <Input
+                                        placeholder="Give your event a bold name..."
                                         value={formData.title}
                                         onChange={e => updateFormData({ title: e.target.value })}
-                                        className={cn(
-                                            "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-zinc-950/80 placeholder:text-zinc-700",
-                                            errors.title && "border-rose-500/50"
-                                        )}
+                                        error={errors.title}
                                     />
-                                    {errors.title && <p className="text-rose-500 text-[10px] font-bold ml-1">{errors.title}</p>}
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Tagline</label>
-                                    <input
+                                    <Input
                                         type="text"
                                         placeholder="A short punchy catchphrase..."
                                         value={formData.tagline}
                                         onChange={e => updateFormData({ tagline: e.target.value })}
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-zinc-900/50 placeholder:text-zinc-700"
                                     />
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Event Description</label>
-                                    <textarea
+                                    <Textarea
                                         placeholder="Describe the event goals and details..."
                                         rows={4}
                                         value={formData.description}
                                         onChange={e => updateFormData({ description: e.target.value })}
-                                        className={cn(
-                                            "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-base font-medium transition-all focus:outline-none focus:border-cyan-500/50 focus:bg-zinc-900/50 placeholder:text-zinc-700 resize-none",
-                                            errors.description && "border-rose-500/50"
-                                        )}
+                                        error={errors.description}
                                     />
-                                    {errors.description && <p className="text-rose-500 text-[10px] font-bold ml-1">{errors.description}</p>}
                                 </div>
 
                                 <div className="space-y-3">
@@ -579,18 +570,14 @@ export default function CreateEventWizard() {
                                                 <Sparkles size={14} className="text-blue-400" />
                                                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Part of a Larger Fest?</p>
                                             </div>
-                                            <select
+                                            <Select
                                                 value={formData.parentEventId}
                                                 onChange={e => updateFormData({ parentEventId: e.target.value })}
-                                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white focus:outline-none focus:border-blue-500/50 transition-all appearance-none cursor-pointer"
-                                            >
-                                                <option value="" className="bg-[#0c0c14] text-white">Standalone Event (No Parent)</option>
-                                                {umbrellaEvents.map(fest => (
-                                                    <option key={fest.id} value={fest.id} className="bg-[#0c0c14] text-white">
-                                                        {fest.title}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                options={[
+                                                    { value: "", label: "Standalone Event (No Parent)" },
+                                                    ...umbrellaEvents.map(fest => ({ value: fest.id, label: fest.title }))
+                                                ]}
+                                            />
                                             <p className="text-[9px] text-zinc-600 font-medium italic">Selecting a parent fest allows this event to be categorized under the fest dashboard.</p>
                                         </div>
                                     )}
@@ -603,25 +590,20 @@ export default function CreateEventWizard() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Start Time</label>
-                                        <input
+                                        <Input
                                             type="datetime-local"
                                             value={formData.startTime}
                                             onChange={e => updateFormData({ startTime: e.target.value })}
-                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">End Time</label>
-                                        <input
+                                        <Input
                                             type="datetime-local"
                                             value={formData.endTime}
                                             onChange={e => updateFormData({ endTime: e.target.value })}
-                                            className={cn(
-                                                "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium",
-                                                errors.endTime && "border-rose-500/50"
-                                            )}
+                                            error={errors.endTime}
                                         />
-                                        {errors.endTime && <p className="text-rose-500 text-[9px] font-bold ml-1">{errors.endTime}</p>}
                                     </div>
                                 </div>
 
@@ -634,29 +616,21 @@ export default function CreateEventWizard() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
                                             <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Registration Opens</label>
-                                            <input
+                                            <Input
                                                 type="datetime-local"
                                                 value={formData.regStartTime}
                                                 onChange={e => updateFormData({ regStartTime: e.target.value })}
-                                                className={cn(
-                                                    "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium",
-                                                    errors.regStartTime && "border-rose-500/50"
-                                                )}
+                                                error={errors.regStartTime}
                                             />
-                                            {errors.regStartTime && <p className="text-rose-500 text-[9px] font-bold ml-1">{errors.regStartTime}</p>}
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Registration Closes</label>
-                                            <input
+                                            <Input
                                                 type="datetime-local"
                                                 value={formData.regEndTime}
                                                 onChange={e => updateFormData({ regEndTime: e.target.value })}
-                                                className={cn(
-                                                    "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium",
-                                                    errors.regEndTime && "border-rose-500/50"
-                                                )}
+                                                error={errors.regEndTime}
                                             />
-                                            {errors.regEndTime && <p className="text-rose-500 text-[9px] font-bold ml-1">{errors.regEndTime}</p>}
                                             <p className="text-[9px] text-zinc-600 font-medium italic ml-1">Must be before event start time</p>
                                         </div>
                                     </div>
@@ -819,16 +793,14 @@ export default function CreateEventWizard() {
 
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Projected Budget (INR)</label>
-                                    <div className="relative">
-                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-bold text-zinc-700">₹</span>
-                                        <input
-                                            type="number"
-                                            placeholder="0"
-                                            value={formData.budgetRequired}
-                                            onChange={e => updateFormData({ budgetRequired: e.target.value })}
-                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-6 py-4 text-xl font-bold focus:outline-none focus:border-cyan-500 transition-all placeholder:text-zinc-800"
-                                        />
-                                    </div>
+                                    <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={formData.budgetRequired}
+                                        onChange={e => updateFormData({ budgetRequired: e.target.value })}
+                                        leftIcon={<span className="text-xl font-bold text-zinc-700">₹</span>}
+                                        className="text-xl font-bold h-16"
+                                    />
                                 </div>
                             </div>
                         )}

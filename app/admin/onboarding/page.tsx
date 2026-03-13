@@ -16,7 +16,7 @@ import type { OnboardResult } from "@/app/api/admin/bulk-onboard/route";
 import { onboardUserAction, updateUserAction, deleteUserAction } from "@/app/actions/admin";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Input, Select } from "@/components/ui/Input";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -236,7 +236,7 @@ export default function RosterManagementPage() {
     const [results, setResults] = useState<OnboardResult[]>([]);
     const [progress, setProgress] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
-    const [defaultPassword, setDefaultPassword] = useState("");
+    const [defaultPassword, setDefaultPassword] = useState("Welcome@CampusBuzz2026");
     const [showPreviewErrors, setShowPreviewErrors] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const BATCH_SIZE = 10;
@@ -265,13 +265,13 @@ export default function RosterManagementPage() {
         );
 
         const res = await Promise.all(promises);
-        counts.hods = res[0].count ?? 0;
-        counts.faculty = res[1].count ?? 0;
-        counts.students = res[2].count ?? 0;
+        counts.hods = (res[0] as any).count ?? 0;
+        counts.faculty = (res[1] as any).count ?? 0;
+        counts.students = (res[2] as any).count ?? 0;
         setStats(counts);
     }, []);
 
-    const fetchRoster = useCallback(async (instId: string) => {
+    const loadRoster = useCallback(async (instId: string) => {
         setLoading(true);
         const { data, error } = await supabase
             .from("users")
@@ -285,6 +285,8 @@ export default function RosterManagementPage() {
                 departments(name)
             `)
             .eq("institution_id", instId)
+            // ── Security Filter: Exclude current user from roster list ──
+            .neq("id", user?.dbId || "")
             .order("created_at", { ascending: false });
 
         if (!error && data) {
@@ -294,7 +296,7 @@ export default function RosterManagementPage() {
             })));
         }
         setLoading(false);
-    }, []);
+    }, [user?.dbId]);
 
     const fetchDepts = useCallback(async (instId: string) => {
         const { data } = await supabase.from("departments").select("id, name").eq("institution_id", instId);
@@ -309,9 +311,9 @@ export default function RosterManagementPage() {
             .then(({ data }) => { if (data?.email_domain) institutionDomain.current = data.email_domain; });
 
         fetchStats(user.institution_id);
-        fetchRoster(user.institution_id);
+        loadRoster(user.institution_id);
         fetchDepts(user.institution_id);
-    }, [user?.institution_id, fetchStats, fetchRoster, fetchDepts]);
+    }, [user?.institution_id, fetchStats, loadRoster, fetchDepts]);
 
     const filteredRoster = roster.filter(u => {
         const matchesSearch = u.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -358,67 +360,85 @@ export default function RosterManagementPage() {
         if (file) handleFile(file);
     }
 
-    async function startImport() {
-        const valid = parsedRows.filter(r => r._errors.length === 0);
-        if (valid.length === 0) {
-            alert("No valid rows to import. Fix the errors first.");
-            return;
-        }
-        if (!defaultPassword) {
-            alert("Please set a default password for new accounts.");
+    async function handleBulkUpload() {
+        const adminInstId = user?.institution_id;
+        if (!adminInstId) {
+            alert("Administrative Context Missing: Institution ID not resolved.");
             return;
         }
 
-        // ── Fetch admin's JWT so the API can resolve institution_id ─────
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token ?? "";
-        if (!token) {
-            alert("Session expired. Please log in again.");
+        const valid = parsedRows.filter(r => r._errors.length === 0);
+        if (valid.length === 0) {
+            alert("Data Integrity Violation: No valid nodes identified for deployment.");
+            return;
+        }
+
+        if (!defaultPassword) {
+            alert("Security Protocol: Default passkey required for account generation.");
             return;
         }
 
         setPhase("importing");
         setTotalCount(valid.length);
         setProgress(0);
+
+        // 2. Department Lookup Map
+        const { data: depts } = await supabase
+            .from("departments")
+            .select("id, name")
+            .eq("institution_id", adminInstId);
+        
+        const deptMap = new Map((depts || []).map(d => [d.name.toLowerCase(), d.id]));
+
         const allResults: OnboardResult[] = [];
 
-        for (let i = 0; i < valid.length; i += BATCH_SIZE) {
-            const batch = valid.slice(i, i + BATCH_SIZE);
-            const res = await fetch("/api/admin/bulk-onboard", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,   // ← institution scoping
-                },
-                body: JSON.stringify({
-                    rows: batch,
-                    password: defaultPassword
-                }),
-            });
-            const json = await res.json();
-            if (!res.ok && !json.results) {
-                // API-level error (e.g. 403 Unauthorized or no institution set up)
-                allResults.push(...batch.map(row => ({
-                    email: row.email,
-                    full_name: row.full_name,
-                    status: "error" as const,
-                    message: json.error ?? "API error",
-                })));
-            } else if (json.results) {
-                allResults.push(...json.results);
+        // 3. CSV Processing Loop
+        for (let i = 0; i < valid.length; i++) {
+            const row = valid[i];
+            
+            // Link Department (Case-insensitive match)
+            const departmentId = deptMap.get(row.department_name.trim().toLowerCase()) || null;
+            if (!departmentId) {
+                console.warn(`⚠️ [Integrity] Department Mismatch: [${row.department_name}] not found in institutional registry.`);
             }
-            setProgress(Math.min(i + BATCH_SIZE, valid.length));
-            await new Promise(r => setTimeout(r, 150));
+
+            // 4. Database Operations (Auth Creation & Profile Sync via Server Action)
+            const res = await onboardUserAction({
+                email: row.email.trim(),
+                fullName: row.full_name.trim(),
+                role: row.role.toLowerCase() as any,
+                departmentId: departmentId,
+                password: defaultPassword
+            });
+
+            if (res.success) {
+                allResults.push({ 
+                    email: row.email, 
+                    full_name: row.full_name, 
+                    status: "created" 
+                });
+            } else {
+                allResults.push({ 
+                    email: row.email, 
+                    full_name: row.full_name, 
+                    status: "error", 
+                    message: res.error || "Execution failed" 
+                });
+            }
+
+            setProgress(i + 1);
+            // Non-blocking delay for UI smoothness
+            await new Promise(r => setTimeout(r, 10));
         }
 
         setResults(allResults);
         setPhase("done");
 
-        // Refresh data
-        if (user?.institution_id) {
-            fetchRoster(user.institution_id);
-            fetchStats(user.institution_id);
-        }
+        // 5. Refresh & Feedback
+        loadRoster(adminInstId);
+        fetchStats(adminInstId);
+        const successCount = allResults.filter(r => r.status === "created").length;
+        alert(`Institutional Infrastructure Deployed: ${successCount} users onboarded successfully.`);
     }
 
     function reset() {
@@ -532,7 +552,7 @@ export default function RosterManagementPage() {
                             </div>
                             <div className="flex items-center gap-3 w-full md:w-auto">
                                 <button
-                                    onClick={() => user?.institution_id && fetchRoster(user.institution_id)}
+                                    onClick={() => user?.institution_id && loadRoster(user.institution_id)}
                                     className="p-2.5 rounded-xl border border-zinc-800 text-zinc-500 hover:text-white transition-all"
                                 >
                                     <RefreshCw size={16} className={cn(loading && "animate-spin")} />
@@ -605,8 +625,18 @@ export default function RosterManagementPage() {
                                                                 <Pencil size={14} />
                                                             </button>
                                                             <button
-                                                                onClick={() => setDeletingUser(u)}
-                                                                className="p-1.5 rounded-lg hover:bg-rose-500/10 text-zinc-400 hover:text-rose-400 transition-all"
+                                                                onClick={() => {
+                                                                    if (u.role === "admin") return;
+                                                                    setDeletingUser(u);
+                                                                }}
+                                                                disabled={u.role === "admin"}
+                                                                title={u.role === "admin" ? "System accounts can only be managed by the Platform Founder." : "Delete User"}
+                                                                className={cn(
+                                                                    "p-1.5 rounded-lg transition-all",
+                                                                    u.role === "admin" 
+                                                                        ? "opacity-20 cursor-not-allowed text-zinc-600" 
+                                                                        : "hover:bg-rose-500/10 text-zinc-400 hover:text-rose-400"
+                                                                )}
                                                             >
                                                                 <Trash2 size={14} />
                                                             </button>
@@ -720,7 +750,7 @@ export default function RosterManagementPage() {
                                             <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] font-black uppercase tracking-widest">{validRows.length} Nodes Verified</Badge>
                                         </div>
                                     </div>
-                                    <Button onClick={startImport} disabled={validRows.length === 0} className="bg-white text-zinc-950 hover:bg-zinc-200 rounded-xl h-12 px-8 font-black uppercase tracking-widest text-xs">
+                                    <Button onClick={handleBulkUpload} disabled={validRows.length === 0} className="bg-white text-zinc-950 hover:bg-zinc-200 rounded-xl h-12 px-8 font-black uppercase tracking-widest text-xs">
                                         Execute Import
                                     </Button>
                                 </div>
@@ -769,8 +799,10 @@ export default function RosterManagementPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-3">
-                                    <p className="text-3xl font-black italic tracking-tighter text-white">Syncing Roster Intelligence</p>
-                                    <p className="text-sm text-zinc-500 max-w-sm mx-auto font-medium leading-relaxed">Connecting to institutional domain clusters. Safeguarding identity metadata. <span className="text-indigo-400">Avoid interruption.</span></p>
+                                    <p className="text-3xl font-black italic tracking-tighter text-white">
+                                        Importing Cluster: {progress} / {totalCount}
+                                    </p>
+                                    <p className="text-sm text-zinc-500 max-w-sm mx-auto font-medium leading-relaxed">Syncing Roster Intelligence. Safeguarding identity metadata. <span className="text-indigo-400">Avoid interruption.</span></p>
                                 </div>
                             </div>
                         )}
@@ -808,13 +840,13 @@ export default function RosterManagementPage() {
             <UserActionModal
                 isOpen={showAddModal}
                 onClose={() => setShowAddModal(false)}
-                onSuccess={() => { if (user?.institution_id) { fetchRoster(user.institution_id); fetchStats(user.institution_id); } }}
+                onSuccess={() => { if (user?.institution_id) { loadRoster(user.institution_id); fetchStats(user.institution_id); } }}
             />
 
             <UserActionModal
                 isOpen={!!editingUser}
                 onClose={() => setEditingUser(null)}
-                onSuccess={() => { if (user?.institution_id) fetchRoster(user.institution_id); }}
+                onSuccess={() => { if (user?.institution_id) loadRoster(user.institution_id); }}
                 existingUser={editingUser}
             />
 
@@ -834,11 +866,16 @@ export default function RosterManagementPage() {
                             <Button onClick={() => setDeletingUser(null)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-2xl h-16 font-bold text-sm">Abort Operation</Button>
                             <Button
                                 onClick={async () => {
+                                    if (deletingUser.id === user?.dbId) {
+                                        alert("Security Violation: You cannot delete your own administrative account.");
+                                        setDeletingUser(null);
+                                        return;
+                                    }
                                     const res = await deleteUserAction(deletingUser.id);
                                     if (res.success) {
                                         setDeletingUser(null);
                                         if (user?.institution_id) {
-                                            fetchRoster(user.institution_id);
+                                            loadRoster(user.institution_id);
                                             fetchStats(user.institution_id);
                                         }
                                     } else {
@@ -962,44 +999,39 @@ function UserActionModal({ isOpen, onClose, onSuccess, existingUser }: {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
                     <div className="space-y-3">
                         <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Legal Designation</label>
-                        <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="e.g. Vikram Seth" className="bg-zinc-950/50 border-zinc-800 rounded-2xl h-14 px-5 text-sm font-bold focus:ring-indigo-500/20" />
+                        <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="e.g. Vikram Seth" className="h-14 px-5 font-bold" />
                     </div>
                     <div className="space-y-3">
                         <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Secure Domain Email</label>
-                        <Input value={form.email} disabled={!!existingUser} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="vikram@college.edu" className="bg-zinc-950/50 border-zinc-800 rounded-2xl h-14 px-5 text-sm font-mono tracking-tighter disabled:opacity-30" />
+                        <Input value={form.email} disabled={!!existingUser} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="vikram@college.edu" className="h-14 px-5 font-mono tracking-tighter" />
                     </div>
                     <div className="space-y-3">
                         <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Platform Permissions</label>
-                        <div className="relative">
-                            <select
-                                value={form.role}
-                                onChange={e => setForm({ ...form, role: e.target.value })}
-                                className="w-full bg-zinc-950/50 border border-zinc-800 rounded-2xl h-14 px-5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/50 appearance-none font-bold shadow-inner"
-                            >
-                                <option value="student" className="bg-zinc-900">STUDENT</option>
-                                <option value="faculty" className="bg-zinc-900">FACULTY</option>
-                                <option value="hod" className="bg-zinc-900">DEPT HEAD (HOD)</option>
-                                <option value="admin" className="bg-zinc-900">INSTITUTION ADMIN</option>
-                            </select>
-                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none opacity-40"><Filter size={14} /></div>
-                        </div>
+                        <Select
+                            value={form.role}
+                            onChange={e => setForm({ ...form, role: e.target.value })}
+                            options={[
+                                { value: "student", label: "STUDENT" },
+                                { value: "faculty", label: "FACULTY" },
+                                { value: "hod", label: "DEPT HEAD (HOD)" },
+                                { value: "admin", label: "INSTITUTION ADMIN" },
+                                { value: "founder", label: "PLATFORM FOUNDER" },
+                            ]}
+                            className="h-14 px-5 font-bold"
+                        />
                     </div>
-                    <div className="space-y-3">
-                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Institutional Cluster</label>
-                        <div className="relative">
-                            <select
+                    {form.role !== 'founder' && (
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Institutional Cluster</label>
+                            <Select
                                 value={form.department_id}
                                 onChange={e => setForm({ ...form, department_id: e.target.value })}
-                                className="w-full bg-zinc-950/50 border border-zinc-800 rounded-2xl h-14 px-5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/50 appearance-none font-bold shadow-inner"
-                            >
-                                <option value="" className="bg-zinc-900">
-                                    {deptsLoading ? "Loading clusters..." : "Select Department"}
-                                </option>
-                                {localDepts.map(d => <option key={d.id} value={d.id} className="bg-zinc-900">{d.name}</option>)}
-                            </select>
-                            <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none opacity-40"><Building2 size={14} /></div>
+                                placeholder={deptsLoading ? "Loading clusters..." : "Select Department"}
+                                options={localDepts.map(d => ({ value: d.id, label: d.name }))}
+                                className="h-14 px-5 font-bold"
+                            />
                         </div>
-                    </div>
+                    )}
                     {!existingUser && (
                         <div className="space-y-3 md:col-span-2">
                             <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest ml-1 flex items-center gap-2">
@@ -1027,6 +1059,7 @@ function RoleBadge({ role }: { role: string }) {
         faculty: { label: "Faculty Intelligence", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
         hod: { label: "Dept Governance", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
         admin: { label: "System Core", color: "bg-rose-500/10 text-rose-400 border-rose-500/20" },
+        founder: { label: "Platform Founder", color: "bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]" },
     };
     const r = roles[role?.toLowerCase()] || { label: role || "—", color: "bg-zinc-800 text-zinc-500 border-zinc-700" };
     return (

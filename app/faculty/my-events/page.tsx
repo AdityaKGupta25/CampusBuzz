@@ -846,6 +846,14 @@ const FILTER_TABS: { key: StatusFilter; label: string }[] = [
 ];
 
 export default function FacultyMyEventsPage() {
+    return (
+        <React.Suspense fallback={<div className="flex h-screen items-center justify-center text-white/40"><Loader2 size={24} className="animate-spin" /></div>}>
+            <FacultyMyEventsContent />
+        </React.Suspense>
+    );
+}
+
+function FacultyMyEventsContent() {
     const { user } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();

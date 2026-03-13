@@ -29,7 +29,7 @@ const serviceClient = createClient(
 export interface OnboardUserPayload {
     email: string;
     fullName: string;
-    role: "student" | "faculty" | "hod" | "admin";
+    role: "student" | "faculty" | "hod" | "admin" | "founder";
     departmentId: string | null;
     password?: string;
 }
@@ -146,7 +146,7 @@ export async function updateUserAction(payload: {
     userId: string;
     email: string;
     fullName: string;
-    role: "student" | "faculty" | "hod" | "admin";
+    role: "student" | "faculty" | "hod" | "admin" | "founder";
     departmentId: string | null;
 }) {
     try {
@@ -174,18 +174,25 @@ export async function updateUserAction(payload: {
             .eq("email", session.user.email)
             .single();
 
-        if (adminProfile?.role !== "admin") return { error: "Permission denied. Admin role required." };
+        if (adminProfile?.role !== "admin" && adminProfile?.role !== "founder") {
+            return { error: "Permission denied. Required administrative clearance not detected." };
+        }
 
         // Ensure the target user belongs to the same institution
         const { data: targetUser } = await serviceClient
             .from("users")
-            .select("institution_id")
+            .select("institution_id, role")
             .eq("id", payload.userId)
             .single();
 
         if (!targetUser) return { error: "User not found." };
-        if (targetUser.institution_id !== adminProfile.institution_id) {
-            return { error: "Security breach: Destination user belongs to a different institution." };
+
+        // ── Founder Protection: Global owners cannot belong to a specific cluster ──
+        const isFounder = targetUser.role === 'founder' || payload.role === 'founder';
+
+        // Check institution match (bypass for founders as they are global)
+        if (!isFounder && targetUser.institution_id !== adminProfile.institution_id) {
+            return { error: "Security breach: User context mismatch." };
         }
 
         // VALIDATION: One HOD per Department
@@ -208,7 +215,8 @@ export async function updateUserAction(payload: {
             .update({
                 full_name: payload.fullName,
                 role: payload.role,
-                department_id: payload.departmentId || null,
+                department_id: isFounder ? null : (payload.departmentId || null),
+                institution_id: isFounder ? null : targetUser.institution_id
             })
             .eq("id", payload.userId);
 

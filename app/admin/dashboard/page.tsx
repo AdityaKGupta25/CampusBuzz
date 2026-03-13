@@ -8,7 +8,9 @@ import {
     Building2, CalendarDays, CheckCircle2, XCircle,
     Loader2, Gavel, FileWarning, BarChart3, Zap,
     ArrowUpRight, Clock, Eye, UploadCloud,
+    MapPin, Sparkles, Wand2, ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -265,71 +267,106 @@ function EscalationRow({ event, index }: { event: EscalatedEvent; index: number 
 
 // ─── Empty State ─────────────────────────────────────────────────────────────
 
-function EmptyState({ onGetStarted }: { onGetStarted: () => void }) {
+function SetupWizard({ adminName }: { adminName: string }) {
+    const router = useRouter();
+    
+    const steps = [
+        {
+            id: "venues",
+            title: "Configure Campus Venues",
+            desc: "Register your auditoriums, labs, and grounds to enable event bookings.",
+            icon: <MapPin size={20} className="text-emerald-400" />,
+            href: "/admin/venues",
+            color: "emerald",
+        },
+        {
+            id: "depts",
+            title: "Create Academic Departments",
+            desc: "Define your institution structure and assign HODs to manage approvals.",
+            icon: <Building2 size={20} className="text-blue-400" />,
+            href: "/admin/departments",
+            color: "blue",
+        },
+        {
+            id: "onboard",
+            title: "Bulk Onboard Staff & Students",
+            desc: "Import your college roster via CSV to grant system access instantly.",
+            icon: <UploadCloud size={20} className="text-violet-400" />,
+            href: "/admin/onboarding",
+            color: "violet",
+        }
+    ];
+
     return (
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-6">
-            {/* ambient glow */}
-            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] pointer-events-none"
-                style={{ background: "radial-gradient(ellipse at center top, rgba(59,130,246,0.09) 0%, transparent 70%)" }} />
+        <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+            {/* Premium background effects */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] opacity-20 pointer-events-none"
+                style={{ background: "radial-gradient(circle at center top, #3b82f6 0%, transparent 70%)" }} />
+            <div className="absolute bottom-0 right-0 w-[400px] h-[400px] opacity-10 pointer-events-none"
+                style={{ background: "radial-gradient(circle at bottom right, #8b5cf6 0%, transparent 70%)" }} />
 
-            <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="relative z-10 max-w-lg w-full text-center space-y-8"
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="relative z-10 w-full max-w-2xl space-y-12"
             >
-                {/* Icon */}
-                <div className="flex justify-center">
-                    <div className="w-24 h-24 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center"
-                        style={{ boxShadow: "0 0 60px rgba(59,130,246,0.15)" }}>
-                        <Building2 size={40} className="text-blue-400" />
-                    </div>
-                </div>
-
-                {/* Text */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-center gap-2">
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black bg-blue-500/10 border border-blue-500/20 text-blue-400 uppercase tracking-widest">
-                            Institution Not Configured
-                        </span>
-                    </div>
-                    <h1 className="text-3xl font-bold text-white tracking-tight">
-                        Your campus is an empty canvas.
+                {/* Introduction */}
+                <div className="text-center space-y-4">
+                    <motion.div 
+                        initial={{ y: -20 }} animate={{ y: 0 }}
+                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-[0.2em]"
+                    >
+                        <Sparkles size={12} /> Genesis Mode Active
+                    </motion.div>
+                    <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">
+                        Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Admin</span>.
                     </h1>
-                    <p className="text-zinc-500 text-sm leading-relaxed">
-                        No departments, faculty, or students have been onboarded yet.
-                        Start by uploading your college roster to bring the platform to life.
+                    <p className="text-zinc-500 text-sm max-w-md mx-auto leading-relaxed">
+                        Your Mission Control is ready. Follow these 3 critical steps to initialize your campus in the CampusBuzz ecosystem.
                     </p>
                 </div>
 
-                {/* Primary CTA */}
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={onGetStarted}
-                    className="w-full flex items-center justify-center gap-3 py-4 rounded-xl text-white font-bold text-sm"
-                    style={{
-                        background: "linear-gradient(135deg, #3b82f6, #6366f1)",
-                        boxShadow: "0 16px 40px rgba(59,130,246,0.25)",
-                    }}
-                >
-                    <UploadCloud size={18} />
-                    🚀 Get Started: Upload your College Roster via Bulk Onboard
-                </motion.button>
+                {/* Vertical Stepper */}
+                <div className="space-y-4">
+                    {steps.map((step, idx) => (
+                        <motion.button
+                            key={step.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.1 * idx }}
+                            onClick={() => router.push(step.href)}
+                            className="w-full group relative text-left p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800 hover:border-zinc-500 transition-all flex items-center gap-6"
+                        >
+                            {/* Step Number Badge */}
+                            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center text-xs font-black text-zinc-600 group-hover:text-white transition-colors">
+                                0{idx + 1}
+                            </div>
 
-                {/* Steps */}
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                    {[
-                        { step: "01", label: "Upload CSV", desc: "Faculty, students, HODs" },
-                        { step: "02", label: "Auto-Dept", desc: "Departments are created" },
-                        { step: "03", label: "Go Live", desc: "Platform is ready" },
-                    ].map(({ step, label, desc }) => (
-                        <div key={step} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-left space-y-1">
-                            <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{step}</p>
-                            <p className="text-xs font-bold text-white">{label}</p>
-                            <p className="text-[10px] text-zinc-600">{desc}</p>
-                        </div>
+                            {/* Icon & Details */}
+                            <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg bg-${step.color}-500/10 border border-${step.color}-500/20`}>
+                                        {step.icon}
+                                    </div>
+                                    <h3 className="font-bold text-white text-lg">{step.title}</h3>
+                                </div>
+                                <p className="text-zinc-500 text-xs leading-relaxed ml-11">
+                                    {step.desc}
+                                </p>
+                            </div>
+
+                            <ArrowRight size={20} className="text-zinc-700 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                            
+                            {/* Hover highlight layer */}
+                            <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-zinc-500/20 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                        </motion.button>
                     ))}
+                </div>
+
+                <div className="text-center">
+                    <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest flex items-center justify-center gap-2">
+                         Automatic Dashboard Activation <Wand2 size={10} /> After Step 02
+                    </p>
                 </div>
             </motion.div>
         </div>
@@ -484,10 +521,19 @@ export default function AdminDashboardPage() {
             setDepts(deptReports);
             setEscalated(escalatedList);
             setLastRefresh(new Date());
+            
+            // ── Comprehensive Day 1 Check ──
+            // Day 1 if:
+            // 1. No Departments (Critical)
+            // 2. No Events (Critical)
+            // 3. AND No Students yet
+            const noDepts = (deptsRes.data?.length ?? 0) === 0;
+            const noEvents = (eventsRes.count ?? 0) === 0;
+            const noFaculty = (facultyRes.count ?? 0) === 0;
+            const noStudents = (studentsRes.count ?? 0) === 0;
 
-            // Empty-state: no departments AND no students yet for this institution
-            const noData = (deptsRes.data?.length ?? 0) === 0 && (studentsRes.count ?? 0) === 0;
-            setIsEmpty(noData);
+            // Day 1 if the primary pillars are missing
+            setIsEmpty(noDepts && noEvents && noFaculty);
         } catch (err) {
             console.error("[AdminDashboard] load error:", err);
         } finally {
@@ -506,9 +552,9 @@ export default function AdminDashboardPage() {
         void loadData(user.institution_id);
     }, [loadData, user?.institution_id]);
 
-    // ── Empty state ───────────────────────────────────────────────────────────
+    // ── Setup Wizard (Day 1) ─────────────────────────────────────────────────
     if (!loading && isEmpty) {
-        return <EmptyState onGetStarted={() => router.push("/admin/onboarding")} />;
+        return <SetupWizard adminName={user?.full_name ?? "Admin"} />;
     }
 
     // ── Render ────────────────────────────────────────────────────────────────

@@ -3,9 +3,6 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -73,4 +70,20 @@ html {
 select option {
   background-color: #0c0c14 !important;
   color: white !important;
+}
+
+/* Global Form Contrast Fixes */
+input, textarea, select {
+  color: #ffffff !important; /* text-white */
+  background-color: #09090b !important; /* bg-zinc-950 */
+}
+
+input::placeholder, textarea::placeholder {
+  color: #71717a !important; /* text-zinc-500 */
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: #71717a !important; /* border-zinc-500 */
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) !important; /* ring-1 ring-white/10 */
+  outline: none !important;
 }

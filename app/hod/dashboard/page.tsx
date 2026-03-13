@@ -43,6 +43,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { cn, exportToCSV } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { useUser } from "@/context/UserContext";
@@ -818,13 +819,13 @@ export default function HodDashboardPage() {
                 <section className="flex flex-col sm:flex-row items-center gap-4 bg-zinc-900/40 border border-zinc-800 p-2 rounded-xl">
                     <div className="relative flex-1 group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-cyan-400 transition-colors" size={18} />
-                        <input
+                        <Input
                             id="search-events"
                             type="text"
                             placeholder="Search events or faculty…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl h-12 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
+                            className="pl-12"
                         />
                     </div>
 

@@ -4,6 +4,7 @@ import React from "react";
 import { CheckCircle2, RefreshCw, XCircle, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Input";
 
 export function ConfirmModal({
     event,
@@ -91,7 +92,7 @@ export function ConfirmModal({
                             {isApprove ? "Approval Note" : (isRequest || isUpdateNote) ? "Feedback / Note" : isArchiveReq ? "Archive Request Message" : "Rejection Reason"}
                             {!isApprove && <span className="text-red-500 ml-1">*</span>}
                         </label>
-                        <textarea
+                        <Textarea
                             id={`modal-comment-${action}`}
                             rows={3}
                             value={comment}
@@ -101,10 +102,7 @@ export function ConfirmModal({
                                     ? "Optional — add any conditions or notes..."
                                     : "Required — be clear and concise..."
                             }
-                            className={cn(
-                                "w-full rounded-xl border px-3.5 py-2.5 text-sm text-white border-white/10",
-                                "resize-none focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-slate-600 focus:ring-indigo-500 transition-all shadow-inner bg-white/5"
-                            )}
+                            className="resize-none"
                         />
                     </div>
                 </div>

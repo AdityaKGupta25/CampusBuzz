@@ -50,7 +50,8 @@ const ADMIN_LINKS: NavLink[] = [
 ];
 
 function getNavLinks(role: AppRole | undefined): NavLink[] {
-    return FACULTY_LINKS; // faculty only
+    if (role === "admin") return ADMIN_LINKS;
+    return FACULTY_LINKS;
 }
 
 // ─── Portal brand config per role ────────────────────────────────────────────

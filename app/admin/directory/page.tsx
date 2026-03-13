@@ -115,6 +115,12 @@ export default function InstitutionalCommandCenter() {
     const [clubs, setClubs] = useState<ClubMetric[]>([]);
     const [staff, setStaff] = useState<StaffMember[]>([]);
     const [venues, setVenues] = useState<VenueMetric[]>([]);
+    const [globalCounts, setGlobalCounts] = useState({
+        faculty: 0,
+        hods: 0,
+        depts: 0,
+        clubs: 0
+    });
     const [stats, setStats] = useState<CommandStats>({
         totalUnits: 0,
         totalActiveEvents: 0,
@@ -125,52 +131,51 @@ export default function InstitutionalCommandCenter() {
 
     const loadData = useCallback(async (institutionId: string) => {
         setLoading(true);
+        console.log("🚀 [Admin Directory] Initializing Secure Data Fetch for Institution:", institutionId);
+        
         try {
-            // 1. Fetch Departments & Metrics
-            const { data: deptData } = await supabase
-                .from("departments")
-                .select(`
-                    id, name, budget_cap, budget_used,
-                    users(count),
-                    events(count)
-                `)
-                .eq("institution_id", institutionId)
-                .order("name");
+            // 1. Fetch Precise Counts (KPIs)
+            console.log("📊 [Admin Directory] Fetching KPIs...");
+            const [
+                { count: facultyCount, error: fErr },
+                { count: hodCount, error: hErr },
+                { count: deptCount, error: dErr },
+                { count: clubCount, error: cErr }
+            ] = await Promise.all([
+                supabase.from("users").select("*", { count: 'exact', head: true }).eq("institution_id", institutionId).eq("role", "faculty"),
+                supabase.from("users").select("*", { count: 'exact', head: true }).eq("institution_id", institutionId).eq("role", "hod"),
+                supabase.from("departments").select("*", { count: 'exact', head: true }).eq("institution_id", institutionId),
+                supabase.from("clubs").select("*", { count: 'exact', head: true }).eq("institution_id", institutionId)
+            ]);
 
-            // 2. Fetch Clubs & Faculty
-            const { data: clubData } = await supabase
-                .from("clubs")
-                .select(`
-                    id, name, logo_url,
-                    faculty:users!faculty_in_charge_id(full_name),
-                    department:departments(name),
-                    events(count)
-                `)
-                .eq("institution_id", institutionId)
-                .order("name");
+            if (fErr || hErr || dErr || cErr) {
+                console.error("❌ [Admin Directory] KPI Fetch Error:", { fErr, hErr, dErr, cErr });
+            }
 
-            // 3. Fetch Staff (Faculty & HODs)
-            const { data: staffData } = await supabase
-                .from("users")
-                .select(`
-                    id, full_name, role, email,
-                    department:departments(name),
-                    created_events:events!creator_id(count),
-                    supervised_events:events!faculty_in_charge_id(count)
-                `)
-                .eq("institution_id", institutionId)
-                .in("role", ["faculty", "hod", "admin", "founder"])
-                .order("full_name");
+            setGlobalCounts({
+                faculty: facultyCount || 0,
+                hods: hodCount || 0,
+                depts: deptCount || 0,
+                clubs: clubCount || 0
+            });
 
-            // 4. Fetch Venues + Live Events check
-            const { data: venueData } = await supabase
-                .from("venues")
-                .select(`
-                    id, name, capacity, venue_type, is_active,
-                    events(count)
-                `)
-                .eq("institution_id", institutionId)
-                .order("name");
+            // 2. Fetch Core Data Sets
+            console.log("📂 [Admin Directory] Syncing Unit Data...");
+            const [
+                { data: deptData, error: deptErr },
+                { data: clubData, error: clubErr },
+                { data: staffData, error: staffErr },
+                { data: venueData, error: venueErr }
+            ] = await Promise.all([
+                supabase.from("departments").select(`id, name, budget_cap, budget_used, users(count), events(count)`).eq("institution_id", institutionId).order("name"),
+                supabase.from("clubs").select(`id, name, logo_url, faculty:users!faculty_in_charge_id(full_name), department:departments(name), events(count)`).eq("institution_id", institutionId).order("name"),
+                supabase.from("users").select(`id, full_name, role, email, department:departments(name), created_events:events!creator_id(count), supervised_events:events!faculty_in_charge_id(count)`).eq("institution_id", institutionId).in("role", ["faculty", "hod"]).order("full_name"),
+                supabase.from("venues").select(`id, name, capacity, venue_type, is_active, events(count)`).eq("institution_id", institutionId).order("name")
+            ]);
+
+            if (deptErr || clubErr || staffErr || venueErr) {
+                console.error("❌ [Admin Directory] Core Data Sync Error:", { deptErr, clubErr, staffErr, venueErr });
+            }
 
             const { data: liveEvents } = await supabase
                 .from("events")
@@ -178,10 +183,12 @@ export default function InstitutionalCommandCenter() {
                 .eq("status", "live")
                 .eq("institution_id", institutionId);
 
-            const liveVenueIds = new Set(liveEvents?.map(e => e.venue_id).filter(Boolean));
+            const liveVenueIds = new Set((liveEvents || []).map(e => e.venue_id).filter(Boolean));
 
-            // Mappings & Calculations
-            const mappedDepts: DeptMetric[] = (deptData ?? []).map((d: any) => ({
+            // 3. Transformation & Mapping
+            console.log("⚙️ [Admin Directory] Processing and Mapping Data...");
+            
+            const mappedDepts: DeptMetric[] = (deptData || []).map((d: any) => ({
                 id: d.id,
                 name: d.name,
                 budget_used: d.budget_used || 0,
@@ -190,35 +197,35 @@ export default function InstitutionalCommandCenter() {
                 active_events: d.events?.[0]?.count || 0
             }));
 
-            const mappedClubs: ClubMetric[] = (clubData ?? []).map((c: any) => ({
+            const mappedClubs: ClubMetric[] = (clubData || []).map((c: any) => ({
                 id: c.id,
                 name: c.name,
                 logo_url: c.logo_url,
                 faculty_name: c.faculty?.full_name || "Unassigned",
                 department_name: c.department?.name || "Independent",
                 event_count: c.events?.[0]?.count || 0,
-                member_count: c.registrations_through_events?.[0]?.count || c.events?.[0]?.count * 12 || 0
+                member_count: (c.events?.[0]?.count || 0) * 12
             }));
 
-            const mappedStaff: StaffMember[] = (staffData ?? []).map((s: any) => {
+            const mappedStaff: StaffMember[] = (staffData || []).map((s: any) => {
                 const totalEvents = (s.created_events?.[0]?.count || 0) + (s.supervised_events?.[0]?.count || 0);
                 return {
                     id: s.id,
                     full_name: s.full_name,
                     role: s.role,
                     email: s.email,
-                    department_name: s.department?.name || "Corporate",
+                    department_name: s.department?.name || "Unassigned",
                     managed_unit: s.role === "hod" ? s.department?.name : (mappedClubs.find(c => c.faculty_name === s.full_name)?.name || null),
                     activity_score: Math.min(100, 60 + (totalEvents * 8))
                 };
             });
 
-            const mappedVenues: VenueMetric[] = (venueData ?? []).map((v: any) => ({
+            const mappedVenues: VenueMetric[] = (venueData || []).map((v: any) => ({
                 id: v.id,
                 name: v.name,
                 capacity: v.capacity || 0,
                 venue_type: v.venue_type || "Generic",
-                is_active: liveVenueIds.has(v.id) ? true : false, // Re-purposing is_active here to mean "Currently Hosting"
+                is_active: liveVenueIds.has(v.id),
                 usage_count: v.events?.[0]?.count || 0
             }));
 
@@ -227,16 +234,16 @@ export default function InstitutionalCommandCenter() {
             setStaff(mappedStaff);
             setVenues(mappedVenues);
 
-            // Dynamic Stats
             setStats({
-                totalUnits: mappedDepts.length + mappedClubs.length,
+                totalUnits: (deptCount || 0) + (clubCount || 0),
                 totalActiveEvents: mappedDepts.reduce((acc, d) => acc + d.active_events, 0),
                 budgetUtilization: Math.round((mappedDepts.reduce((acc, d) => acc + d.budget_used, 0) / (mappedDepts.reduce((acc, d) => acc + d.budget_cap, 0) || 1)) * 100),
                 securityScore: 99
             });
 
+            console.log("✅ [Admin Directory] Data Fetch Complete. Units Synchronized.");
         } catch (err) {
-            console.error("[CommandCenter] Error loading data:", err);
+            console.error("🔥 [Admin Directory] Critical Load Failure:", err);
         } finally {
             setLoading(false);
         }
@@ -263,8 +270,8 @@ export default function InstitutionalCommandCenter() {
     const dynamicKPIs = useMemo(() => {
         switch (activeTab) {
             case "departments": return [
-                { label: "Total Units", value: depts.length, icon: Building2, color: "text-blue-400" },
-                { label: "Global Faculty", value: depts.reduce((a, d) => a + d.faculty_count, 0), icon: Users, color: "text-indigo-400" },
+                { label: "Total Units", value: globalCounts.depts, icon: Building2, color: "text-blue-400" },
+                { label: "Global Faculty", value: globalCounts.faculty, icon: Users, color: "text-indigo-400" },
                 { label: "Budget Utilization", value: `${stats.budgetUtilization}%`, icon: Wallet, color: "text-emerald-400" },
                 { label: "Active Nodes", value: depts.reduce((a, d) => a + d.active_events, 0), icon: Activity, color: "text-rose-400" },
             ];
@@ -275,10 +282,10 @@ export default function InstitutionalCommandCenter() {
                 { label: "Active Events", value: clubs.reduce((a, c) => a + c.event_count, 0), icon: Star, color: "text-rose-400" },
             ];
             case "staff": return [
-                { label: "Command Staff", value: staff.length, icon: Users, color: "text-blue-400" },
-                { label: "HODs", value: staff.filter(m => m.role === "hod").length, icon: Shield, color: "text-indigo-400" },
+                { label: "Global Staff", value: globalCounts.faculty + globalCounts.hods, icon: Users, color: "text-blue-400" },
+                { label: "Institutional HODs", value: globalCounts.hods, icon: Shield, color: "text-indigo-400" },
                 { label: "Avg Activity", value: staff.length > 0 ? Math.round(staff.reduce((a, m) => a + m.activity_score, 0) / staff.length) : 0, icon: Activity, color: "text-emerald-400" },
-                { label: "Faculty Leads", value: staff.filter(m => m.role === "faculty").length, icon: Hash, color: "text-rose-400" },
+                { label: "Faculty Participation", value: globalCounts.faculty, icon: Hash, color: "text-rose-400" },
             ];
             case "venues": return [
                 { label: "Total Facilities", value: venues.length, icon: MapPin, color: "text-blue-400" },
@@ -397,7 +404,7 @@ export default function InstitutionalCommandCenter() {
                                         ))}
                                     </div>
                                 )}
-                                {activeTab === "staff" && <StaffTable staff={filteredData as StaffMember[]} />}
+                                {activeTab === "staff" && <StaffTable staff={filteredData as StaffMember[]} onSelect={(m) => console.log("Identified Personnel:", m.id, m.full_name)} />}
                                 {activeTab === "venues" && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {(filteredData as VenueMetric[]).map((venue, i) => (
@@ -530,7 +537,7 @@ function ClubNode({ club, idx, onClick }: { club: ClubMetric; idx: number; onCli
     );
 }
 
-function StaffTable({ staff }: { staff: StaffMember[] }) {
+function StaffTable({ staff, onSelect }: { staff: StaffMember[]; onSelect: (m: StaffMember) => void }) {
     return (
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden backdrop-blur-xl shadow-2xl">
             <div className="overflow-x-auto">
@@ -546,7 +553,11 @@ function StaffTable({ staff }: { staff: StaffMember[] }) {
                     </thead>
                     <tbody className="divide-y divide-zinc-800">
                         {staff.map((m) => (
-                            <tr key={m.id} className="hover:bg-zinc-800/40 transition-colors group">
+                            <tr
+                                key={m.id}
+                                onClick={() => onSelect(m)}
+                                className="hover:bg-zinc-800/40 transition-colors group cursor-pointer"
+                            >
                                 <td className="px-8 py-5">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-black text-sm uppercase">
@@ -562,11 +573,12 @@ function StaffTable({ staff }: { staff: StaffMember[] }) {
                                     <div className="flex justify-center">
                                         <span className={cn(
                                             "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] border",
-                                            m.role === 'hod' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                                                m.role === 'faculty' ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" :
-                                                    "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                            m.role === 'founder' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                                                m.role === 'hod' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                                                    m.role === 'faculty' ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" :
+                                                        "bg-rose-500/10 text-rose-400 border-rose-500/20"
                                         )}>
-                                            {m.role}
+                                            {m.role === 'founder' ? 'Platform Founder' : m.role}
                                         </span>
                                     </div>
                                 </td>

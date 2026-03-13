@@ -18,7 +18,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 {label && (
                     <label
                         htmlFor={inputId}
-                        className="text-sm font-medium text-slate-700"
+                        className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1"
                     >
                         {label}
                         {props.required && <span className="text-red-500 ml-1">*</span>}
@@ -36,16 +36,16 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
                         ref={ref}
                         id={inputId}
                         className={cn(
-                            "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900",
-                            "transition-all duration-150",
-                            "placeholder:text-slate-400",
-                            "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent",
-                            "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50",
+                            "w-full rounded-2xl border bg-zinc-950/50 px-5 py-4 text-sm text-zinc-100",
+                            "transition-all duration-150 outline-none",
+                            "placeholder:text-zinc-500",
+                            "focus:border-zinc-500 focus:ring-1 focus:ring-white/10",
+                            "disabled:opacity-30 disabled:cursor-not-allowed",
                             error
                                 ? "border-red-400 focus:ring-red-400"
-                                : "border-slate-200 hover:border-slate-300",
-                            leftIcon && "pl-10",
-                            rightIcon && "pr-10",
+                                : "border-zinc-800",
+                            leftIcon && "pl-12",
+                            rightIcon && "pr-12",
                             className
                         )}
                         {...props}
@@ -91,7 +91,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
                 {label && (
                     <label
                         htmlFor={inputId}
-                        className="text-sm font-medium text-slate-700"
+                        className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1"
                     >
                         {label}
                         {props.required && <span className="text-red-500 ml-1">*</span>}
@@ -102,14 +102,14 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
                     ref={ref}
                     id={inputId}
                     className={cn(
-                        "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900",
-                        "transition-all duration-150 resize-none",
-                        "placeholder:text-slate-400",
-                        "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent",
-                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50",
+                        "w-full rounded-2xl border bg-zinc-950/50 px-5 py-4 text-sm text-zinc-100",
+                        "transition-all duration-150 resize-none outline-none",
+                        "placeholder:text-zinc-500",
+                        "focus:border-zinc-500 focus:ring-1 focus:ring-white/10",
+                        "disabled:opacity-30 disabled:cursor-not-allowed",
                         error
                             ? "border-red-400 focus:ring-red-400"
-                            : "border-slate-200 hover:border-slate-300",
+                            : "border-zinc-800",
                         className
                     )}
                     rows={props.rows ?? 4}
@@ -146,7 +146,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
                 {label && (
                     <label
                         htmlFor={inputId}
-                        className="text-sm font-medium text-slate-700"
+                        className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1"
                     >
                         {label}
                         {props.required && <span className="text-red-500 ml-1">*</span>}
@@ -157,13 +157,13 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
                     ref={ref}
                     id={inputId}
                     className={cn(
-                        "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900",
-                        "transition-all duration-150 appearance-none cursor-pointer",
-                        "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent",
-                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50",
+                        "w-full rounded-2xl border bg-zinc-950/50 px-5 py-4 text-sm text-zinc-100",
+                        "transition-all duration-150 appearance-none cursor-pointer outline-none",
+                        "focus:border-zinc-500 focus:ring-1 focus:ring-white/10",
+                        "disabled:opacity-30 disabled:cursor-not-allowed",
                         error
                             ? "border-red-400 focus:ring-red-400"
-                            : "border-slate-200 hover:border-slate-300",
+                            : "border-zinc-800",
                         className
                     )}
                     {...props}
