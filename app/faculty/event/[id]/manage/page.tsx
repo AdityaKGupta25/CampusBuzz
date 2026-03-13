@@ -192,6 +192,8 @@ interface EventData {
     rulebook_url?: string | null;
     governance_note?: string | null;
     rejection_reason?: string | null;
+    reg_start_time?: string | null;
+    reg_end_time?: string | null;
 }
 
 interface ConflictStatus {
@@ -332,7 +334,7 @@ function EventManageDashboardInner() {
                     supabase.from("registrations").select("*, student:users(full_name, email, department:departments(name)), event:events!inner(institution_id)").in("event_id", allRelevantIds).eq("event.institution_id", institutionId),
                     supabase.from("events").select("id, title, status, start_time, end_time, registered_count, attended_count, fest_domain_id, fest_category, club_id").eq("parent_event_id", eventId).eq("institution_id", institutionId).order("start_time"),
                     supabase.from("fest_domains").select("*").eq("umbrella_event_id", eventId).order("created_at"),
-                    supabase.from("event_staff").select("*, student:users(id, full_name, email)").eq("event_id", eventId)
+                    supabase.from("event_staff").select("*, student:student_id(id, full_name, email)").eq("event_id", eventId).order("assigned_at", { ascending: false })
                 ]);
 
                 // Phase 4: State updates
@@ -548,15 +550,17 @@ function EventManageDashboardInner() {
                     sponsors: event.sponsors,
                     resource_links: event.resource_links,
                     participation_tracks: event.participation_tracks || [],
-                    rulebook_url: event.rulebook_url,
+                    rulebook_url: event.rulebook_url || null,
                     is_competition: event.is_competition !== false,
-                    collect_resume: event.registration_config.collect_resume,
-                    collect_github: event.registration_config.collect_github,
-                    collect_linkedin: event.registration_config.collect_linkedin,
-                    is_team_event: event.registration_config.team_participation,
-                    min_team_size: event.registration_config.team_min_size,
-                    max_team_size: event.registration_config.team_max_size,
+                    collect_resume: !!event.registration_config?.collect_resume,
+                    collect_github: !!event.registration_config?.collect_github,
+                    collect_linkedin: !!event.registration_config?.collect_linkedin,
+                    is_team_event: !!event.registration_config?.team_participation,
+                    min_team_size: event.registration_config?.team_min_size ?? 1,
+                    max_team_size: event.registration_config?.team_max_size ?? 4,
                     is_public: !!event.is_public,
+                    reg_start_time: event.reg_start_time || null,
+                    reg_end_time: event.reg_end_time || null,
                 })
                 .eq("id", eventId)
                 .eq("institution_id", user?.institution_id || "");
@@ -565,8 +569,8 @@ function EventManageDashboardInner() {
             showMessage("Operation successful! Unit data synchronized to campus ledger.");
             setEvent({ ...event });
         } catch (err: any) {
-            console.error(err);
-            showMessage("Save failed: " + err.message, "error");
+            console.error("Critical Save Failure:", err);
+            showMessage("Save failed: " + (err.message || "Unknown institutional protocol error (Schema mismatch suspected)"), "error");
         } finally {
             setSaving(false);
         }
@@ -614,6 +618,8 @@ function EventManageDashboardInner() {
                     registration_config: event.registration_config,
                     is_public: !!event.is_public,
                     status: nextStatus,
+                    reg_start_time: event.reg_start_time || null,
+                    reg_end_time: event.reg_end_time || null,
                 })
                 .eq("id", eventId)
                 .eq("institution_id", user?.institution_id || "");
@@ -1152,7 +1158,7 @@ function EventManageDashboardInner() {
                                 if (event?.parent_event_id) {
                                     router.push(`/faculty/event/${event.parent_event_id}/manage?tab=sub-events`);
                                 } else {
-                                    router.push(isArchived ? "/faculty/my-events?archived=true" : "/faculty/my-events");
+                                    router.push(isArchived || searchParams.get("archived") === "true" ? "/faculty/my-events?archived=true" : "/faculty/my-events");
                                 }
                             }}
                             className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-[0.2em] mb-12 group"
@@ -1427,7 +1433,7 @@ function EventManageDashboardInner() {
                                 <ShieldCheck size={12} /> Institutional Registry Archive
                             </p>
                             <p className="text-sm font-bold text-rose-100/90 mt-1 max-w-2xl leading-relaxed">
-                                🏛️ ARCHIVED RECORD: This event is locked for institutional audit and is in read-only mode. All governance data is now immutable.
+                                This event is locked for institutional audit and is in read-only mode. All governance data is now immutable.
                             </p>
                         </div>
                     </div>
@@ -1474,6 +1480,29 @@ function EventManageDashboardInner() {
                                     <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
                                         Stage: {event?.status?.replace('_', ' ')}
                                     </span>
+                                    {event && (event.status === 'approved' || event.status === 'live') && (
+                                        (() => {
+                                            const now = new Date();
+                                            const start = new Date(event.start_time);
+                                            const end = new Date(event.end_time);
+                                            const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
+                                            const regEnd = event.reg_end_time ? new Date(event.reg_end_time) : null;
+
+                                            if (now >= start && now <= end) {
+                                                return <span className="text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 ml-2">● LIVE NOW</span>;
+                                            }
+                                            if (regStart && regEnd) {
+                                                if (now >= regStart && now <= regEnd) {
+                                                    return <span className="text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 ml-2">● REGISTRATION OPEN</span>;
+                                                } else if (now < regStart) {
+                                                    return <span className="text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 border border-zinc-500/20 ml-2">● UPCOMING</span>;
+                                                } else if (now > regEnd && now < start) {
+                                                    return <span className="text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20 ml-2">● REGISTRATION CLOSED</span>;
+                                                }
+                                            }
+                                            return null;
+                                        })()
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1711,12 +1740,18 @@ function EventManageDashboardInner() {
                                 {activeTab === "organizers" && event && (
                                     <StaffTab
                                         eventId={eventId}
+                                        eventTitle={event.title}
                                         staff={eventStaff}
                                         onRefresh={async () => {
-                                            const { data } = await supabase.from("event_staff").select("*, student:users(id, full_name, email)").eq("event_id", eventId);
+                                            const { data, error } = await supabase.from("event_staff")
+                                                .select("*, student:student_id(id, full_name, email)")
+                                                .eq("event_id", eventId)
+                                                .order("assigned_at", { ascending: false });
+                                            if (error) alert("Sync Error: " + error.message);
                                             if (data) setEventStaff(data);
                                         }}
                                         readOnly={isReadOnly}
+                                        institutionId={user?.institution_id}
                                     />
                                 )}
                             </motion.div>
@@ -2692,6 +2727,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                             </div>
                             <ToggleSwitch
                                 enabled={!!formData.requires_submission}
+                                disabled={readOnly}
                                 onChange={(val) => {
                                     setSubmissionOverridden(true);
                                     setFormData({ ...formData, requires_submission: val });
@@ -3580,7 +3616,22 @@ function SettingsTab({
     venueAvailability,
     isStaffStudent
 }: any) {
+    const isArchived = event.status === "archived";
     const selectedVenue = venues.find((v: any) => v.id === event.venue_id);
+
+    // Helper to format ISO strings to local YYYY-MM-DDTHH:mm for input
+    const toLocalISO = (iso?: string) => {
+        if (!iso) return "";
+        try {
+            const date = new Date(iso);
+            if (isNaN(date.getTime())) return "";
+            const offset = date.getTimezoneOffset();
+            const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+            return localDate.toISOString().slice(0, 16);
+        } catch (e) {
+            return "";
+        }
+    };
 
     return (
         <div className="space-y-10 pb-20">
@@ -3609,27 +3660,70 @@ function SettingsTab({
 
                     <div className="space-y-6 relative z-10">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Start Date & Time</label>
+                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Start Date & Time (Event Happens)</label>
                             <div className="relative">
                                 <input
                                     disabled={readOnly}
                                     type="datetime-local"
-                                    value={event.start_time?.slice(0, 16)}
+                                    value={toLocalISO(event.start_time)}
                                     onChange={e => updateEvent({ start_time: new Date(e.target.value).toISOString() })}
                                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/40 transition-all disabled:opacity-50"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">End Date & Time</label>
+                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">End Date & Time (Event Over)</label>
                             <div className="relative">
                                 <input
                                     disabled={readOnly}
                                     type="datetime-local"
-                                    value={event.end_time?.slice(0, 16)}
+                                    value={toLocalISO(event.end_time)}
                                     onChange={e => updateEvent({ end_time: new Date(e.target.value).toISOString() })}
                                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/40 transition-all disabled:opacity-50"
                                 />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Registration Window Section */}
+                <div className="p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
+                    <div className="flex items-center justify-between relative z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                                <Timer size={18} />
+                            </div>
+                            <div>
+                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Registration Window</h3>
+                                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mt-0.5">Control enrollment bounds</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6 relative z-10">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Registration Opens (Students apply)</label>
+                            <div className="relative">
+                                <input
+                                    disabled={readOnly}
+                                    type="datetime-local"
+                                    value={toLocalISO(event.reg_start_time)}
+                                    onChange={e => updateEvent({ reg_start_time: new Date(e.target.value).toISOString() })}
+                                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-cyan-500/40 transition-all disabled:opacity-50"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Registration Closes (Deadline)</label>
+                            <div className="relative">
+                                <input
+                                    disabled={readOnly}
+                                    type="datetime-local"
+                                    value={toLocalISO(event.reg_end_time)}
+                                    onChange={e => updateEvent({ reg_end_time: new Date(e.target.value).toISOString() })}
+                                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-cyan-500/40 transition-all disabled:opacity-50"
+                                />
+                                <p className="text-[8px] text-zinc-600 font-bold mt-2 italic ml-1 uppercase tracking-widest">Enrollment must end before the event starts.</p>
                             </div>
                         </div>
                     </div>
@@ -3867,7 +3961,7 @@ function SettingsTab({
             )}
 
             {/* Lifecycle Area */}
-            {event.status !== "archived" && (
+            {!isArchived && (
                 <div className="p-12 border-2 border-rose-500/10 rounded-[4rem] bg-rose-500/[0.02] flex items-center justify-between gap-10 overflow-hidden relative">
                     <div className="space-y-4 relative z-10">
                         <div className="flex items-center gap-3 text-rose-500">
@@ -4993,7 +5087,7 @@ function DomainsTab({ eventId, domains, onRefresh, onDeleteDomain, readOnly }: {
     );
 }
 
-function StaffTab({ eventId, staff, clubs, onRefresh, readOnly }: any) {
+function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTitle }: any) {
     const [search, setSearch] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
@@ -5005,12 +5099,17 @@ function StaffTab({ eventId, staff, clubs, onRefresh, readOnly }: any) {
     const [editGrant, setEditGrant] = useState(false);
     const [updating, setUpdating] = useState(false);
 
-    const roles = ["Organizer", "Co-Organizer", "Volunteer", "Lead Volunteer", "Tech Lead", "Creative Lead"];
+    const roles = ["Organizer", "Overall Coordinator", "Co-Organizer", "Student Host", "Volunteer", "Lead Volunteer", "Tech Lead", "Creative Lead"];
 
     const handleSearch = async (query: string) => {
         setSearch(query);
-        if (query.length < 3) { setSearchResults([]); return; }
-        const { data, error } = await supabase.from("profiles").select("id, full_name, email").or(`full_name.ilike.%${query}%,email.ilike.%${query}%`).limit(5);
+        if (query.length < 2) { setSearchResults([]); return; }
+        const { data, error } = await supabase.from("users")
+            .select("id, full_name, email")
+            .eq('role', 'student')
+            .eq('institution_id', institutionId)
+            .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+            .limit(5);
         if (!error && data) setSearchResults(data);
     };
 
@@ -5018,11 +5117,13 @@ function StaffTab({ eventId, staff, clubs, onRefresh, readOnly }: any) {
         if (!selectedStudent) return;
         setAssigning(true);
         try {
-            const { error } = await supabase.from("event_staff").insert({
-                event_id: eventId,
-                student_id: selectedStudent.id,
-                role: selectedRole,
-                grant_edit_access: grantEdit
+            const { error } = await supabase.rpc('assign_event_staff', {
+                p_event_id: eventId,
+                p_student_id: selectedStudent.id,
+                p_role: selectedRole,
+                p_edit_access: grantEdit,
+                p_notif_title: "New Role Assigned",
+                p_notif_message: `You have been assigned as ${selectedRole} for the event: ${eventTitle || 'Event'}.`
             });
             if (error) throw error;
             onRefresh();
@@ -5048,6 +5149,7 @@ function StaffTab({ eventId, staff, clubs, onRefresh, readOnly }: any) {
         setUpdating(true);
         try {
             const { error } = await supabase.from("event_staff").update({
+                role: editRole,
                 role_name: editRole,
                 grant_edit_access: editGrant
             }).eq("id", editingStaff.id);

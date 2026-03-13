@@ -135,6 +135,8 @@ export interface DbEvent {
     created_at: string;
     banner_url: string | null;
     registered_count: number;
+    reg_start_time: string | null;
+    reg_end_time: string | null;
     is_archived: boolean;
     governance_note?: string | null;
     rejection_reason?: string | null;
@@ -204,6 +206,8 @@ export async function fetchPublicEvents(institutionId?: string): Promise<DbEvent
             created_at,
             banner_url,
             registered_count,
+            reg_start_time,
+            reg_end_time,
             is_archived,
             is_public,
             is_featured,

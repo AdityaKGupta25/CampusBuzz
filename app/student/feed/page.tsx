@@ -64,6 +64,10 @@ interface CampusEvent {
     isGlobal: boolean;
     collegeName: string;
     institutionId: string;
+    startTime: string;
+    endTime: string;
+    regStartTime: string | null;
+    regEndTime: string | null;
 }
 
 interface Notification {
@@ -135,6 +139,10 @@ function mapDbEvent(row: DbEvent, index: number): CampusEvent {
         isGlobal: row.is_public,
         collegeName: row.institution?.name ?? "College",
         institutionId: row.institution_id,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        regStartTime: row.reg_start_time,
+        regEndTime: row.reg_end_time,
     };
 }
 
@@ -319,17 +327,39 @@ function FeaturedCard({ event, onRegister, registered, forceWide }: { event: Cam
                 </div>
 
                 <div className="flex gap-2">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onRegister(); }}
-                        className={cn(
-                            "flex-1 h-12 rounded-full text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-2",
-                            registered
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                : "bg-white text-black hover:bg-zinc-200 shadow-xl"
-                        )}
-                    >
-                        {registered ? <><Check size={12} /> REGISTERED</> : "DIRECT REGISTER"}
-                    </button>
+                    {(() => {
+                        const now = new Date();
+                        const regStart = event.regStartTime ? new Date(event.regStartTime) : null;
+                        const regEnd = event.regEndTime ? new Date(event.regEndTime) : null;
+
+                        let label = "DIRECT REGISTER";
+                        let isDisabled = false;
+
+                        if (regStart && now < regStart) {
+                            label = "STARTS SOON";
+                            isDisabled = true;
+                        } else if (regEnd && now > regEnd) {
+                            label = "REG. CLOSED";
+                            isDisabled = true;
+                        }
+
+                        return (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); if (!isDisabled) onRegister(); }}
+                                disabled={isDisabled}
+                                className={cn(
+                                    "flex-1 h-12 rounded-full text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-2",
+                                    registered
+                                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                        : isDisabled
+                                            ? "bg-zinc-900 border border-white/5 text-zinc-600 cursor-not-allowed"
+                                            : "bg-white text-black hover:bg-zinc-200 shadow-xl"
+                                )}
+                            >
+                                {registered ? <><Check size={12} /> REGISTERED</> : label}
+                            </button>
+                        );
+                    })()}
                     <button className="w-12 h-12 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all">
                         <ArrowRight size={14} />
                     </button>
@@ -438,14 +468,38 @@ function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRe
                         <div className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
                             <Check size={12} /> Confirmed
                         </div>
-                    ) : (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onRegister(); }}
-                            className="w-full py-2.5 rounded-xl bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-indigo-400 active:scale-95 transition-all shadow-lg shadow-indigo-500/20"
-                        >
-                            {event.isTeam ? "Join Team" : "Register"} <ChevronRight size={12} />
-                        </button>
-                    )}
+                    ) : (() => {
+                        const now = new Date();
+                        const regStart = event.regStartTime ? new Date(event.regStartTime) : null;
+                        const regEnd = event.regEndTime ? new Date(event.regEndTime) : null;
+                        const eventStart = new Date(event.startTime);
+
+                        let label = event.isTeam ? "Join Team" : "Register Now";
+                        let isDisabled = false;
+
+                        if (regStart && now < regStart) {
+                            label = "Registration Starts Soon";
+                            isDisabled = true;
+                        } else if (regEnd && now > regEnd) {
+                            label = "Registration Closed";
+                            isDisabled = true;
+                        }
+
+                        return (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); if (!isDisabled) onRegister(); }}
+                                disabled={isDisabled}
+                                className={cn(
+                                    "w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all shadow-lg",
+                                    isDisabled
+                                        ? "bg-zinc-900 border border-white/5 text-zinc-600 cursor-not-allowed"
+                                        : "bg-indigo-500 text-white hover:bg-indigo-400 shadow-indigo-500/20 active:scale-95"
+                                )}
+                            >
+                                {label} {!isDisabled && <ChevronRight size={12} />}
+                            </button>
+                        );
+                    })()}
                 </div>
             </div>
         </div>
@@ -566,10 +620,11 @@ export default function StudentFeedPage() {
                 if (profile) {
                     setUserId(profile.id);
                     setKarmaPoints((profile as any).karma_points ?? 0);
-                    // registrations are personal — no institution filter needed
+                    // registrations are personal — scoped safely
                     const { data: regs } = await supabase
                         .from("registrations")
                         .select("event_id")
+                        .eq("student_id", profile.id);
                     if (regs) setRegistered(new Set(regs.map((r: any) => r.event_id)));
 
                     // Load Active Missions for Blueprint Editing
@@ -645,11 +700,25 @@ export default function StudentFeedPage() {
     };
 
     // ── Filtering ──
+    const now = new Date();
     const filteredEvents = allEvents.filter((e) => {
+        const start = new Date(e.startTime);
+        const end = new Date(e.endTime);
+        const regEnd = e.regEndTime ? new Date(e.regEndTime) : null;
+
         // Tab Filter
-        if (activeTab === "upcoming" && e.status !== "approved") return false;
-        if (activeTab === "live" && e.status !== "live") return false;
-        if (activeTab === "past" && e.status !== "completed") return false;
+        const isPast = e.status === "completed" || now > end;
+        const isLive = e.status === "live" || (now >= start && now <= end && !isPast);
+        const isUpcoming = !isPast && !isLive && (e.status === "approved" || e.status === "live");
+
+        if (activeTab === "upcoming") {
+            // Only show if it's upcoming
+            if (!isUpcoming) return false;
+            // Hide if registration ended AND user hasn't registered
+            if (regEnd && now >= regEnd && !registered.has(e.id)) return false;
+        }
+        if (activeTab === "live" && !isLive) return false;
+        if (activeTab === "past" && !isPast) return false;
 
         // Marketplace vs Campus
         if (feedFilter === "campus") {

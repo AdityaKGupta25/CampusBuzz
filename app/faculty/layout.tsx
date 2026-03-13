@@ -428,13 +428,19 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
         if (saved === "1") setCollapsed(true);
     }, []);
 
+    const pathname = usePathname();
+    const isMissionInterface = role === 'student' && pathname.includes('/manage');
+
     useEffect(() => {
         if (!user && !localStorage.getItem("supabase.auth.token")) return; // Wait for hydration
         if (user && user.role !== "faculty" && user.role !== "admin") {
             // Strict silo: if you aren't faculty, you don't belong here
-            router.replace(`/${user.role}/dashboard`);
+            // EXCEPT if you are a student authorized to manage a specific event (Mission Interface)
+            if (!isMissionInterface) {
+                router.replace(`/student/feed`);
+            }
         }
-    }, [user, router]);
+    }, [user, router, isMissionInterface]);
 
     function toggleCollapse() {
         setCollapsed((v) => {
@@ -448,9 +454,6 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
         await supabase.auth.signOut();
         router.push("/login");
     }
-
-    const pathname = usePathname();
-    const isMissionInterface = role === 'student' && pathname.includes('/manage');
 
     return (
         <div

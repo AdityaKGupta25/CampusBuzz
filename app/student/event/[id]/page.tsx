@@ -88,6 +88,9 @@ interface EventDetail {
     };
     rulebook_url?: string | null;
     parent_event_id?: string | null;
+    reg_start_time?: string | null;
+    reg_end_time?: string | null;
+    staff?: { id: string; role_name: string; role: string; student: { full_name: string; email: string; id: string } }[];
 }
 
 interface FestSubEvent {
@@ -204,10 +207,12 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                         registered_count, banner_url, faqs, sponsors, resource_links,
                         is_umbrella, event_type, is_competition, parent_event_id,
                         participation_tracks, rulebook_url, institution_id,
+                        reg_start_time, reg_end_time,
                         creator:users!events_creator_id_fkey ( id, full_name ),
                         department:departments ( name ),
                         venue:venues ( name, capacity ),
-                        club:clubs ( name, logo_url )
+                        club:clubs ( name, logo_url ),
+                        staff:event_staff ( id, role, role_name, student:users ( id, full_name, email ) )
                     `)
                     .eq("id", id)
                     .eq("institution_id", institutionId)
@@ -372,7 +377,15 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
     // ── Register Logic ────────────────────────────────────────────────────────
     async function handleRegister() {
-        if (event?.status === "completed" || regStatus === "registered" || regStatus === "confirmed" || regStatus === "loading") return;
+        if (!event) return;
+        const now = new Date();
+        const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
+        const regEnd = event.reg_end_time ? new Date(event.reg_end_time) : null;
+
+        if (regStart && now < regStart) return;
+        if (regEnd && now > regEnd) return;
+        
+        if (event.status === "completed" || regStatus === "registered" || regStatus === "confirmed" || regStatus === "loading") return;
         setIsRegModalOpen(true);
     }
 
@@ -1407,7 +1420,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 <span className="text-2xl font-black text-rose-400">{event.creator.full_name?.charAt(0) || "F"}</span>
                                             </div>
                                             <div>
-                                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Event Coordinator</p>
+                                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Event In-Charge</p>
                                                 <h3 className="text-base font-black text-white">{event.creator.full_name}</h3>
                                                 <div className="flex items-center gap-1.5 mt-1.5">
                                                     <CheckCircle2 size={10} className="text-emerald-500" />
@@ -1416,12 +1429,48 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Student Coordinators */}
+                                    {event.staff?.filter(s => (s.role_name || s.role) === "Overall Coordinator").map(s => (
+                                        <div key={s.id} className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
+                                            <div className="w-16 h-16 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 overflow-hidden">
+                                                <span className="text-2xl font-black text-cyan-400">{s.student.full_name?.charAt(0) || "S"}</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-cyan-500 uppercase tracking-widest mb-1">Overall Coordinator</p>
+                                                <h3 className="text-base font-black text-white">{s.student.full_name}</h3>
+                                                <div className="flex items-center gap-1.5 mt-1.5">
+                                                    <ShieldCheck size={10} className="text-cyan-500" />
+                                                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest text-nowrap">Student Project Lead</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Other Staff (Minified view) */}
+                                    {(event.staff?.filter(s => (s.role_name || s.role) !== "Overall Coordinator") || []).length > 0 && (
+                                        <div className="col-span-full pt-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                {(event.staff?.filter(s => (s.role_name || s.role) !== "Overall Coordinator") || []).map(s => (
+                                                    <div key={s.id} className="p-4 bg-zinc-950/50 border border-white/5 rounded-xl flex flex-col items-center text-center gap-2">
+                                                        <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-[10px] font-black text-zinc-500">
+                                                            {s.student.full_name?.split(' ').map((n: string) => n[0]).join('')}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-white uppercase truncate px-2">{s.student.full_name}</p>
+                                                            <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">{s.role_name || s.role}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </section>
-                        </div >
+                        </div>
 
                         {/* ── Right Column: Sticky registration card ── */}
-                        < aside className="lg:col-span-4 relative order-first lg:order-last" >
+                        <aside className="lg:col-span-4 relative order-first lg:order-last">
 
                             <div className="sticky top-20 space-y-5">
 
@@ -1513,38 +1562,34 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             ) : event.status !== "completed" && (
                                                 <button
                                                     onClick={handleRegister}
-                                                    disabled={regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading" || previewMode}
+                                                    disabled={
+                                                        regStatus === "registered" ||
+                                                        regStatus === "confirmed" ||
+                                                        isSoldOut ||
+                                                        regStatus === "loading" ||
+                                                        previewMode ||
+                                                        !!(event.reg_start_time && new Date() < new Date(event.reg_start_time)) ||
+                                                        !!(event.reg_end_time && new Date() > new Date(event.reg_end_time))
+                                                    }
                                                     className={cn(
-                                                        "w-full min-h-[52px] py-3.5 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/50",
-                                                        previewMode
-                                                            ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-800"
-                                                            : (regStatus === "registered" || regStatus === "confirmed")
-                                                                ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 cursor-default"
-                                                                : (regStatus === "pending" || regStatus === "waitlisted")
-                                                                    ? "bg-amber-500 text-black"
-                                                                    : regStatus === "cancelled"
-                                                                        ? "bg-zinc-800 text-zinc-500"
-                                                                        : regStatus === "error"
-                                                                            ? "bg-rose-500 text-white"
-                                                                            : isSoldOut
-                                                                                ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                                                                                : "bg-indigo-500 text-white hover:bg-indigo-600 shadow-xl shadow-indigo-500/25 active:scale-[0.98]"
+                                                        "w-full h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                                                        (regStatus === "registered" || regStatus === "confirmed")
+                                                            ? "bg-emerald-500 text-black shadow-xl shadow-emerald-500/20"
+                                                            : (isSoldOut || (event.reg_start_time && new Date() < new Date(event.reg_start_time)) || (event.reg_end_time && new Date() > new Date(event.reg_end_time)))
+                                                                ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5"
+                                                                : "bg-white text-black hover:bg-zinc-200 shadow-2xl shadow-white/10"
                                                     )}
                                                 >
                                                     {previewMode && <><ShieldCheck size={14} /> Preview Mode</>}
                                                     {!previewMode && regStatus === "loading" && <><Loader2 size={14} className="animate-spin" /> Loading...</>}
-                                                    {!previewMode && (regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={14} /> Registered</>}
-                                                    {!previewMode && regStatus === "pending" && "Pending Approval"}
-                                                    {!previewMode && regStatus === "waitlisted" && "Waitlisted"}
-                                                    {!previewMode && regStatus === "cancelled" && "Cancelled"}
-                                                    {!previewMode && regStatus === "error" && "Retry"}
-                                                    {!previewMode && regStatus === "idle" && !isSoldOut && (
+                                                    {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={14} /> Registered</>}
+                                                    {!previewMode && regStatus === "idle" && (event.reg_start_time && new Date() < new Date(event.reg_start_time)) && "Goes Live Soon"}
+                                                    {!previewMode && regStatus === "idle" && (event.reg_end_time && new Date() > new Date(event.reg_end_time)) && "Expired"}
+                                                    {!previewMode && regStatus === "idle" && !(event.reg_start_time && new Date() < new Date(event.reg_start_time)) && !(event.reg_end_time && new Date() > new Date(event.reg_end_time)) && !isSoldOut && (
                                                         <><Ticket size={14} />{isComp ? "Register Now" : "Claim Pass"}</>
                                                     )}
                                                     {!previewMode && regStatus === "idle" && isSoldOut && "Sold Out"}
-                                                    {!previewMode && !["idle", "loading", "registered", "confirmed", "pending", "waitlisted", "cancelled", "error"].includes(regStatus) && (
-                                                        <span className="capitalize">{regStatus}</span>
-                                                    )}
+                                                    {regStatus === "pending" && "Pending Approval"}
                                                 </button>
                                             )}
                                         </div>
@@ -1611,36 +1656,48 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         ))}
                                 </div>
                             </div>
-                        </aside >
-                    </div >
-                </div >
+                        </aside>
+                    </div>
+                </div>
             )}
 
             {/* Sticky mobile action bar */}
             {
                 !previewMode && !isObserver && !isOrganizer && event.status !== "completed" && (
-                    <div className="fixed bottom-0 inset-x-0 z-[90] lg:hidden px-4 pb-6 pt-4"
-                        style={{ background: "linear-gradient(to top, rgba(9,9,11,0.98) 60%, transparent)", backdropFilter: "blur(16px)" }}>
-                        <button
-                            onClick={handleRegister}
-                            disabled={regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading"}
-                            className={cn(
-                                "w-full h-14 rounded-xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
-                                (regStatus === "registered" || regStatus === "confirmed")
-                                    ? "bg-emerald-500 text-black"
-                                    : isSoldOut
-                                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                                        : "bg-indigo-500 text-white shadow-xl shadow-indigo-500/30 hover:bg-indigo-400"
-                            )}
-                        >
-                            {regStatus === "loading" && <Loader2 size={16} className="animate-spin" />}
-                            {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={16} /> Registered</>}
-                            {regStatus === "idle" && !isSoldOut && <><Ticket size={16} />{isComp ? "Register Now" : "Get Pass"}</>}
-                            {regStatus === "idle" && isSoldOut && "Sold Out"}
-                            {regStatus === "pending" && "Pending Approval"}
-                            {regStatus === "waitlisted" && "You're Waitlisted"}
-                        </button>
-                    </div>
+                    (() => {
+                        const now = new Date();
+                        const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
+                        const regEnd = event.reg_end_time ? new Date(event.reg_end_time) : null;
+                        const isNotStarted = !!(regStart && now < regStart);
+                        const isClosed = !!(regEnd && now > regEnd);
+                        
+                        return (
+                            <div className="fixed bottom-0 inset-x-0 z-[90] lg:hidden px-4 pb-6 pt-4"
+                                style={{ background: "linear-gradient(to top, rgba(9,9,11,0.98) 60%, transparent)", backdropFilter: "blur(16px)" }}>
+                                <button
+                                    onClick={handleRegister}
+                                    disabled={!!(regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading" || isNotStarted || isClosed)}
+                                    className={cn(
+                                        "w-full h-14 rounded-xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                                        (regStatus === "registered" || regStatus === "confirmed")
+                                            ? "bg-emerald-500 text-black"
+                                            : (isSoldOut || isNotStarted || isClosed)
+                                                ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                                                : "bg-indigo-500 text-white shadow-xl shadow-indigo-500/30 hover:bg-indigo-400"
+                                    )}
+                                >
+                                    {regStatus === "loading" && <Loader2 size={16} className="animate-spin" />}
+                                    {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={16} /> Registered</>}
+                                    {isNotStarted && "Registration Not Started"}
+                                    {isClosed && "Registration Closed"}
+                                    {!isNotStarted && !isClosed && regStatus === "idle" && !isSoldOut && <><Ticket size={16} />{isComp ? "Register Now" : "Get Pass"}</>}
+                                    {!isNotStarted && !isClosed && regStatus === "idle" && isSoldOut && "Sold Out"}
+                                    {regStatus === "pending" && "Pending Approval"}
+                                    {regStatus === "waitlisted" && "You're Waitlisted"}
+                                </button>
+                            </div>
+                        );
+                    })()
                 )
             }
 

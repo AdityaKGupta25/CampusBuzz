@@ -45,6 +45,8 @@ interface FacultyEvent {
     status: EventStatus;
     start_time: string;
     end_time: string;
+    reg_start_time: string | null;
+    reg_end_time: string | null;
     registered_count: number;   // normalised from live registrations(count) join
     risk_level: "low" | "medium" | "high";
     venue: { name: string } | null;
@@ -62,6 +64,8 @@ interface RawEventRow {
     status: string;
     start_time: string;
     end_time: string;
+    reg_start_time: string | null;
+    reg_end_time: string | null;
     risk_level: string;
     venue: { name: string } | null;
     department: { name: string } | null;
@@ -475,6 +479,50 @@ function EventCard({
                                     <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping inline-block" />
                                 )}
                             </span>
+
+                            {/* Sub-state Indicator for Approved/Live Events */}
+                            {(event.status === 'approved' || event.status === 'live') && (
+                                (() => {
+                                    const now = new Date();
+                                    const start = new Date(event.start_time);
+                                    const end = new Date(event.end_time);
+                                    const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
+                                    const regEnd = event.reg_end_time ? new Date(event.reg_end_time) : null;
+
+                                    if (now >= start && now <= end) {
+                                        return (
+                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border bg-emerald-500/10 border-emerald-500/30 text-emerald-400">
+                                                <Zap size={10} /> LIVE NOW
+                                            </span>
+                                        );
+                                    }
+                                    if (regStart && regEnd) {
+                                        if (now < regStart) {
+                                            return (
+                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border bg-zinc-500/10 border-zinc-500/30 text-zinc-400">
+                                                    <Clock size={10} /> PRE-REGISTRATION
+                                                </span>
+                                            );
+                                        }
+                                        if (now >= regStart && now <= regEnd) {
+                                            return (
+                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border bg-cyan-500/10 border-cyan-500/30 text-cyan-400">
+                                                    <RefreshCw size={10} className="animate-spin-slow" /> ENROLLMENT OPEN
+                                                </span>
+                                            );
+                                        }
+                                        if (now > regEnd && now < start) {
+                                            return (
+                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border bg-amber-500/10 border-amber-500/30 text-amber-400">
+                                                    <Lock size={10} /> ENROLLMENT CLOSED
+                                                </span>
+                                            );
+                                        }
+                                    }
+                                    return null;
+                                })()
+                            )}
+
                             <span className={cn(
                                 "inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full border capitalize",
                                 RISK_COLOR[event.risk_level]
@@ -917,6 +965,8 @@ export default function FacultyMyEventsPage() {
                 status: row.status as EventStatus,
                 start_time: row.start_time,
                 end_time: row.end_time,
+                reg_start_time: row.reg_start_time,
+                reg_end_time: row.reg_end_time,
                 risk_level: row.risk_level as FacultyEvent["risk_level"],
                 venue: row.venue,
                 department: row.department,
@@ -989,8 +1039,8 @@ export default function FacultyMyEventsPage() {
             >
                 <div className="flex items-center gap-4 mb-5">
                     <div className="flex-1">
-                        <p className="text-white/40 text-xs font-medium">Faculty Dashboard</p>
-                        <h1 className="text-white font-extrabold text-xl leading-tight">My Events</h1>
+                        <p className="text-white/40 text-xs font-medium">{showArchived ? "Institutional Registry" : "Faculty Dashboard"}</p>
+                        <h1 className="text-white font-extrabold text-xl leading-tight">{showArchived ? "Archived Events" : "My Events"}</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -1207,6 +1257,16 @@ export default function FacultyMyEventsPage() {
 
             {/* ── Toast Notifications ── */}
             <ToastList toasts={toasts} onDismiss={dismissToast} />
+
+            <style jsx global>{`
+                @keyframes spin-slow {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .animate-spin-slow {
+                    animation: spin-slow 8s linear infinite;
+                }
+            `}</style>
         </div>
     );
 }

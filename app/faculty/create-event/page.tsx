@@ -25,6 +25,7 @@ import {
     Sparkles,
     LayoutPanelTop,
     Wrench,
+    Timer
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -75,6 +76,8 @@ interface FormData {
     venueId: string;
     riskLevel: "low" | "medium" | "high";
     budgetRequired: string;
+    regStartTime: string;
+    regEndTime: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -160,6 +163,8 @@ export default function CreateEventWizard() {
         venueId: "",
         riskLevel: "low",
         budgetRequired: "",
+        regStartTime: "",
+        regEndTime: "",
     });
 
     const [venueAvailability, setVenueAvailability] = useState<VenueAvailability>({});
@@ -295,11 +300,34 @@ export default function CreateEventWizard() {
             if (!formData.clubId) newErrors.clubId = "Please select a club.";
         }
         if (currentStep === 2) {
-            if (!formData.startTime) newErrors.startTime = "Start time is required.";
-            if (!formData.endTime) newErrors.endTime = "End time is required.";
-            if (formData.startTime && formData.endTime && new Date(formData.endTime) <= new Date(formData.startTime)) {
-                newErrors.endTime = "End time must be after start time.";
+            const now = new Date();
+            if (!formData.startTime) {
+                newErrors.startTime = "Start time is required.";
+            } else if (new Date(formData.startTime) < now) {
+                newErrors.startTime = "Start time cannot be in the past.";
             }
+
+            if (!formData.endTime) {
+                newErrors.endTime = "End time is required.";
+            } else if (formData.startTime && new Date(formData.endTime) <= new Date(formData.startTime)) {
+                newErrors.endTime = "End time must be after event start time.";
+            }
+
+            if (!formData.regStartTime) {
+                newErrors.regStartTime = "Registration start is required.";
+            }
+
+            if (!formData.regEndTime) {
+                newErrors.regEndTime = "Registration end is required.";
+            } else {
+                if (formData.regStartTime && new Date(formData.regEndTime) <= new Date(formData.regStartTime)) {
+                    newErrors.regEndTime = "Registration must end after it starts.";
+                }
+                if (formData.startTime && new Date(formData.regEndTime) > new Date(formData.startTime)) {
+                    newErrors.regEndTime = "Registration must close before the event starts.";
+                }
+            }
+
             if (!formData.venueId) newErrors.venueId = "Select a venue.";
             if (formData.venueId && conflictStatus.type === 'HARD') {
                 newErrors.venueId = "HARD CONFLICT: Selected venue is currently occupied.";
@@ -360,7 +388,9 @@ export default function CreateEventWizard() {
                     club_id: (formData.clubId === "none" || !formData.clubId) ? null : formData.clubId,
                     is_umbrella: formData.isUmbrella,
                     parent_event_id: formData.parentEventId || null,
-                    event_type: formData.parentEventId ? "sub_event" : formData.eventType
+                    event_type: formData.parentEventId ? "sub_event" : formData.eventType,
+                    reg_start_time: formData.regStartTime ? new Date(formData.regStartTime).toISOString() : null,
+                    reg_end_time: formData.regEndTime ? new Date(formData.regEndTime).toISOString() : null
                 })
                 .select("id")
                 .single();
@@ -586,8 +616,49 @@ export default function CreateEventWizard() {
                                             type="datetime-local"
                                             value={formData.endTime}
                                             onChange={e => updateFormData({ endTime: e.target.value })}
-                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium"
+                                            className={cn(
+                                                "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium",
+                                                errors.endTime && "border-rose-500/50"
+                                            )}
                                         />
+                                        {errors.endTime && <p className="text-rose-500 text-[9px] font-bold ml-1">{errors.endTime}</p>}
+                                    </div>
+                                </div>
+
+                                {/* Registration Window Section */}
+                                <div className="p-6 rounded-2xl bg-zinc-900/30 border border-white/5 space-y-6">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Timer size={14} className="text-cyan-400" />
+                                        <p className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em]">Registration Window</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Registration Opens</label>
+                                            <input
+                                                type="datetime-local"
+                                                value={formData.regStartTime}
+                                                onChange={e => updateFormData({ regStartTime: e.target.value })}
+                                                className={cn(
+                                                    "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium",
+                                                    errors.regStartTime && "border-rose-500/50"
+                                                )}
+                                            />
+                                            {errors.regStartTime && <p className="text-rose-500 text-[9px] font-bold ml-1">{errors.regStartTime}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Registration Closes</label>
+                                            <input
+                                                type="datetime-local"
+                                                value={formData.regEndTime}
+                                                onChange={e => updateFormData({ regEndTime: e.target.value })}
+                                                className={cn(
+                                                    "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-4 text-sm focus:outline-none focus:border-cyan-500 transition-all font-medium",
+                                                    errors.regEndTime && "border-rose-500/50"
+                                                )}
+                                            />
+                                            {errors.regEndTime && <p className="text-rose-500 text-[9px] font-bold ml-1">{errors.regEndTime}</p>}
+                                            <p className="text-[9px] text-zinc-600 font-medium italic ml-1">Must be before event start time</p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -778,6 +849,7 @@ export default function CreateEventWizard() {
                                     />
                                     <ReviewField label="Commencement" value={formatDateTime(formData.startTime)} icon={<Clock size={12} />} />
                                     <ReviewField label="Conclusion" value={formatDateTime(formData.endTime)} icon={<Clock size={12} />} />
+                                    <ReviewField label="Reg. Window" value={`${formatDateTime(formData.regStartTime)} — ${formatDateTime(formData.regEndTime)}`} icon={<Timer size={12} />} fullWidth />
                                     <ReviewField label="Risk Tier" value={formData.riskLevel.toUpperCase()} icon={<ShieldCheck size={12} />} />
                                     <ReviewField label="Funds (Gross)" value={formatCurrency(Number(formData.budgetRequired))} icon={<DollarSign size={12} />} />
                                 </div>
