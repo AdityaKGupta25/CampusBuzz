@@ -121,7 +121,7 @@ export default function AdminSettingsPage() {
                                     <Building2 size={14} className="text-zinc-500" />
                                     <div className="min-w-0">
                                         <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Institution</p>
-                                        <p className="text-[11px] font-semibold text-zinc-300 truncate">{user?.institution_name || "Assigned Institution"}</p>
+                                        <p className="text-[11px] font-semibold text-zinc-300 truncate">{(user as any)?.institution_name || "Assigned Institution"}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 border border-white/5">

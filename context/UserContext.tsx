@@ -26,6 +26,7 @@ export interface UserProfile {
     department_id: string | null;
     department_name: string | null;
     institution_id: string | null;   // ← tenant key
+    institution_name: string | null;
     created_at: string;
 }
 
@@ -60,6 +61,7 @@ interface UserRow {
     institution_id: string | null;
     created_at: string;
     department: { name: string } | { name: string }[] | null;
+    institution: { name: string } | { name: string }[] | null;
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -87,7 +89,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
                     department_id,
                     institution_id,
                     created_at,
-                    department:departments(name)
+                    department:departments(name),
+                    institution:institutions(name)
                 `)
                 .eq("auth_uid", authUser.id)
                 .single();
@@ -100,10 +103,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
             const row = data as unknown as UserRow;
 
-            // departments join can come back as object or array
+            // departments and institutions joins can come back as object or array
             const dept = Array.isArray(row.department)
                 ? row.department[0]
                 : row.department;
+            const inst = Array.isArray(row.institution)
+                ? row.institution[0]
+                : row.institution;
 
             setUser({
                 authId: authUser.id,
@@ -114,6 +120,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 department_id: row.department_id ?? null,
                 department_name: dept?.name ?? null,
                 institution_id: row.institution_id ?? null,
+                institution_name: inst?.name ?? null,
                 created_at: row.created_at,
             });
 
