@@ -23,10 +23,15 @@ export interface UserProfile {
     full_name: string;
     email: string;
     role: AppRole;
+    avatar_url: string | null;
+    bio: string | null;
+    social_links: any | null;
+    employee_id: string | null;
     department_id: string | null;
     department_name: string | null;
     institution_id: string | null;   // ← tenant key
     institution_name: string | null;
+    institution_logo_url: string | null;
     created_at: string;
 }
 
@@ -57,11 +62,15 @@ interface UserRow {
     full_name: string;
     email: string;
     role: string;
+    avatar_url: string | null;
+    bio: string | null;
+    social_links: any | null;
+    employee_id: string | null;
     department_id: string | null;
     institution_id: string | null;
     created_at: string;
     department: { name: string } | { name: string }[] | null;
-    institution: { name: string } | { name: string }[] | null;
+    institutions: { name: string; logo_url: string | null } | { name: string; logo_url: string | null }[] | null;
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -86,11 +95,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
                     full_name,
                     email,
                     role,
+                    avatar_url,
+                    bio,
+                    social_links,
+                    employee_id,
                     department_id,
                     institution_id,
                     created_at,
                     department:departments(name),
-                    institution:institutions(name)
+                    institutions:institutions(name, logo_url)
                 `)
                 .eq("auth_uid", authUser.id)
                 .single();
@@ -107,9 +120,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
             const dept = Array.isArray(row.department)
                 ? row.department[0]
                 : row.department;
-            const inst = Array.isArray(row.institution)
-                ? row.institution[0]
-                : row.institution;
+            const inst = Array.isArray(row.institutions)
+                ? row.institutions[0]
+                : row.institutions;
 
             setUser({
                 authId: authUser.id,
@@ -117,10 +130,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 full_name: row.full_name ?? authUser.email ?? "User",
                 email: row.email ?? authUser.email ?? "",
                 role: (row.role ?? "student") as AppRole,
+                avatar_url: row.avatar_url ?? null,
+                bio: row.bio ?? null,
+                social_links: row.social_links ?? null,
+                employee_id: row.employee_id ?? null,
                 department_id: row.department_id ?? null,
                 department_name: dept?.name ?? null,
                 institution_id: row.institution_id ?? null,
                 institution_name: inst?.name ?? null,
+                institution_logo_url: inst?.logo_url ?? null,
                 created_at: row.created_at,
             });
 

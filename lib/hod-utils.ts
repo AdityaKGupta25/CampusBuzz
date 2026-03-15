@@ -7,6 +7,7 @@ export interface HodEvent {
     id: string;
     title: string;
     faculty: string;       // users.full_name
+    facultyAvatarUrl: string | null;
     department: string;    // departments.name
     club: string;          // clubs.name
     startDate: string;     // ISO string
@@ -43,6 +44,7 @@ export function mapDbEventToHodEvent(row: DbEvent): HodEvent {
         id: row.id,
         title: row.title,
         faculty: row.creator?.full_name ?? "Unknown",
+        facultyAvatarUrl: row.creator?.avatar_url ?? null,
         department: row.department?.name ?? "—",
         club: (row as any).club?.name ?? "Independant",
         startDate: row.start_time,

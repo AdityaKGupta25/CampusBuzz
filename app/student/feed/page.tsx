@@ -68,14 +68,18 @@ interface CampusEvent {
     endTime: string;
     regStartTime: string | null;
     regEndTime: string | null;
+    creatorAvatarUrl: string | null;
+    institutionLogo: string | null;
 }
 
 interface Notification {
     id: string;
+    title?: string;
     message: string;
     created_at: string;
     is_read: boolean;
     type?: string;
+    link?: string;
 }
 
 // ─── Palette & mapping ────────────────────────────────────────────────────────
@@ -143,6 +147,8 @@ function mapDbEvent(row: DbEvent, index: number): CampusEvent {
         endTime: row.end_time,
         regStartTime: row.reg_start_time,
         regEndTime: row.reg_end_time,
+        creatorAvatarUrl: row.creator?.avatar_url ?? null,
+        institutionLogo: row.institution?.logo_url ?? null,
     };
 }
 
@@ -198,6 +204,7 @@ function NotifDrawer({ open, onClose, notifications, loading }: {
     open: boolean; onClose: () => void;
     notifications: Notification[]; loading: boolean;
 }) {
+    const router = useRouter();
     return (
         <>
             {open && <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm" onClick={onClose} />}
@@ -229,25 +236,35 @@ function NotifDrawer({ open, onClose, notifications, loading }: {
                         </div>
                     ) : notifications.map((n) => (
                         <div key={n.id}
-                            className={cn("rounded-xl p-4 border transition-all",
+                            onClick={() => { if (n.link) router.push(n.link); onClose(); }}
+                            className={cn("rounded-xl p-4 border transition-all cursor-pointer hover:border-indigo-500/30",
                                 !n.is_read
                                     ? "bg-indigo-500/8 border-indigo-500/20"
                                     : "bg-zinc-900 border-zinc-800"
                             )}>
-                            <div className="flex items-start gap-3">
-                                <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
-                                    !n.is_read ? "bg-indigo-500/20" : "bg-white/5")}>
-                                    <Bell size={12} className={!n.is_read ? "text-indigo-400" : "text-zinc-600"} />
+                            <div className="flex items-start gap-4">
+                                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-lg",
+                                    !n.is_read ? "bg-indigo-500/20 shadow-indigo-500/10" : "bg-white/5")}>
+                                    <Bell size={14} className={!n.is_read ? "text-indigo-400" : "text-zinc-600"} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className={cn("text-sm leading-snug", !n.is_read ? "text-white font-semibold" : "text-zinc-400 font-medium")}>
+                                    {n.title && (
+                                        <p className={cn("text-[10px] font-black uppercase tracking-widest mb-1", !n.is_read ? "text-indigo-400" : "text-zinc-500")}>
+                                            {n.title}
+                                        </p>
+                                    )}
+                                    <p className={cn("text-xs leading-relaxed", !n.is_read ? "text-white font-bold" : "text-zinc-400 font-medium")}>
                                         {n.message}
                                     </p>
-                                    <p className="text-[10px] text-zinc-600 font-medium mt-1">
-                                        {new Date(n.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                                    </p>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-tight">
+                                            {new Date(n.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                        </p>
+                                        {n.link && <div className="w-1 h-1 rounded-full bg-zinc-700" />}
+                                        {n.link && <p className="text-[9px] text-indigo-500 font-black uppercase tracking-widest">View Mission</p>}
+                                    </div>
                                 </div>
-                                {!n.is_read && <div className="w-2 h-2 rounded-full bg-indigo-400 shrink-0 mt-1.5" />}
+                                {!n.is_read && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0 mt-2 shadow-[0_0_10px_rgba(129,140,248,0.5)]" />}
                             </div>
                         </div>
                     ))}
@@ -261,7 +278,9 @@ function NotifDrawer({ open, onClose, notifications, loading }: {
 
 function FeaturedCard({ event, onRegister, registered, forceWide }: { event: CampusEvent; onRegister: () => void; registered: boolean; forceWide?: boolean }) {
     const router = useRouter();
+    const { user } = useUser();
     const CatIcon = getCategoryIcon(event.category);
+    const viewerInstitutionId = user?.institution_id;
 
     return (
         <div
@@ -303,9 +322,18 @@ function FeaturedCard({ event, onRegister, registered, forceWide }: { event: Cam
 
             {/* Content Bottom Left */}
             <div className="absolute inset-x-6 bottom-6 flex flex-col gap-1">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-3 mb-2">
+                    {event.creatorAvatarUrl ? (
+                         <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden shrink-0">
+                             <img src={event.creatorAvatarUrl} alt="" className="w-full h-full object-cover" />
+                         </div>
+                    ) : (
+                        <div className="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-[8px] font-black text-indigo-300 shrink-0 capitalize">
+                            {event.organiser?.charAt(0) || "C"}
+                        </div>
+                    )}
                     <span className="text-[9px] font-black text-amber-300 uppercase tracking-[0.2em] bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
-                        {event.isGlobal ? `🌐 ${event.collegeName}` : "🏠 My Campus"}
+                        {event.isGlobal || event.institutionId !== viewerInstitutionId ? `🏛️ ${event.collegeName}` : "🏠 My Campus"}
                     </span>
                     {event.parentEventTitle && (
                         <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em]">
@@ -373,7 +401,9 @@ function FeaturedCard({ event, onRegister, registered, forceWide }: { event: Cam
 
 function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRegister: () => void; registered: boolean }) {
     const router = useRouter();
+    const { user } = useUser();
     const CatIcon = getCategoryIcon(event.category);
+    const viewerInstitutionId = user?.institution_id;
 
     return (
         <div
@@ -412,10 +442,15 @@ function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRe
                 {/* College Badge */}
                 <div className="absolute top-10 left-2.5">
                     <span className={cn(
-                        "text-[8px] font-black px-2 py-0.5 rounded-full border backdrop-blur-md shadow-lg uppercase tracking-widest",
-                        event.isGlobal ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-300" : "bg-white/10 border-white/20 text-white/50"
+                        "text-[8px] font-black px-2 py-1 rounded-full border backdrop-blur-md shadow-lg uppercase tracking-widest flex items-center gap-1.5",
+                        event.institutionId !== viewerInstitutionId ? "bg-white text-black border-white" : "bg-white/10 border-white/20 text-white/50"
                     )}>
-                        {event.isGlobal ? `🌐 ${event.collegeName}` : "My Campus"}
+                        {event.institutionId !== viewerInstitutionId ? (
+                            <>
+                                {event.institutionLogo && <img src={event.institutionLogo} className="w-3 h-3 rounded-sm object-contain" alt="" />}
+                                🏛️ {event.collegeName}
+                            </>
+                        ) : "My Campus"}
                     </span>
                 </div>
 
@@ -440,9 +475,20 @@ function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRe
             {/* Content */}
             <div className="flex flex-col flex-1 p-4">
                 <div className="flex items-start gap-2 mb-2">
-                    <div className="flex-1 min-w-0">
-                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest truncate mb-0.5">{event.organiser}</p>
-                        <h4 className="text-white font-extrabold text-sm leading-snug line-clamp-2">{event.title}</h4>
+                    <div className="flex-1 min-w-0 flex items-center gap-2.5 mb-2">
+                        {event.creatorAvatarUrl ? (
+                            <div className="w-5 h-5 rounded-full border border-white/5 overflow-hidden shrink-0 shadow-sm">
+                                <img src={event.creatorAvatarUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                        ) : (
+                             <div className="w-5 h-5 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[7px] font-black text-zinc-500 shrink-0 capitalize">
+                                {event.organiser?.charAt(0) || "C"}
+                            </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest truncate mb-0.5">{event.organiser}</p>
+                            <h4 className="text-white font-extrabold text-sm leading-snug line-clamp-2">{event.title}</h4>
+                        </div>
                     </div>
                 </div>
 
@@ -632,7 +678,7 @@ export default function StudentFeedPage() {
                         .from("event_staff")
                         .select(`
                             id,
-                            role:role_name,
+                            role_name,
                             grant_edit_access,
                             event:events!inner (
                                 id,
@@ -909,20 +955,19 @@ export default function StudentFeedPage() {
                                     <div
                                         key={mission.id}
                                         onClick={() => router.push(`/faculty/event/${mission.event.id}/manage`)}
-                                        className="w-full bg-gradient-to-r from-indigo-500/10 to-transparent border border-indigo-500/20 rounded-[2rem] p-6 cursor-pointer hover:border-indigo-500/40 transition-all group flex items-center justify-between gap-4"
+                                        className="w-full bg-gradient-to-r from-indigo-500/10 to-indigo-500/5 border border-indigo-500/20 rounded-[2.5rem] p-8 cursor-pointer hover:border-indigo-500/40 hover:bg-indigo-500/[0.07] transition-all group flex items-center justify-between gap-6 relative overflow-hidden ring-1 ring-white/5"
                                     >
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl -translate-y-16 translate-x-16" />
                                         <div className="flex items-center gap-5">
                                             <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-center shrink-0">
                                                 <Sparkles size={20} className="text-indigo-300" />
                                             </div>
                                             <div>
-                                                <div className="flex items-center gap-2 mb-0.5">
-                                                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Organizer Mission</span>
-                                                    <span className="w-1 h-1 rounded-full bg-indigo-500/40" />
+                                                <div className="mb-0.5">
                                                     <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest capitalize">{mission.event.status.replace('_', ' ')}</span>
                                                 </div>
                                                 <h3 className="text-white font-bold text-base tracking-tight leading-tight group-hover:text-indigo-300 transition-colors uppercase italic">{mission.event.title}</h3>
-                                                <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Designate Role: {mission.role}</p>
+                                                <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Designate Role: {mission.role_name || mission.role || 'Organizer'}</p>
                                             </div>
                                         </div>
                                         <div className="h-10 px-4 rounded-xl bg-indigo-500 text-white flex items-center gap-2 text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 whitespace-nowrap">

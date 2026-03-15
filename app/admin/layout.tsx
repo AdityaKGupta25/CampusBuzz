@@ -23,7 +23,6 @@ const ADMIN_LINKS: NavLink[] = [
     { href: "/admin/departments", icon: Building2, label: "Clusters / Departments" },
     { href: "/admin/onboarding", icon: UploadCloud, label: "Bulk Onboard" },
     { href: "/admin/directory", icon: Building2, label: "Full Directory" },
-    { href: "/admin/settings", icon: BookOpen, label: "Inst. Settings" },
 ];
 
 // ─── Brand ────────────────────────────────────────────────────────────────────
@@ -86,8 +85,8 @@ function Sidebar({
                         )}
                     </div>
                     {!collapsed && (
-                        <div className="animate-in fade-in slide-in-from-left-2 duration-500 w-full text-center -mt-1">
-                            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-500/80">
+                        <div className="animate-in fade-in slide-in-from-top-1 duration-700 w-full text-center -mt-1.5 px-4">
+                            <span className="text-[10px] font-black uppercase tracking-[0.45em] bg-gradient-to-r from-rose-500 to-rose-400 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(244,63,94,0.3)] italic">
                                 Institutional Admin
                             </span>
                         </div>
@@ -135,18 +134,34 @@ function Sidebar({
             {/* User + logout */}
             <div className="px-2 py-4 space-y-1 flex-shrink-0"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <div className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl", collapsed && "justify-center")}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-[10px] text-white"
-                        style={{ background: BRAND.gradient }}>
-                        {displayName.slice(0, 1).toUpperCase()}
+                
+                <Link 
+                    href="/admin/profile"
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 group",
+                        collapsed && "justify-center"
+                    )}
+                >
+                    <div className="relative shrink-0">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[10px] text-white transition-transform group-active:scale-95"
+                            style={{ background: BRAND.gradient }}>
+                            {displayName.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-zinc-950 flex items-center justify-center border border-zinc-900 shadow-sm">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                        </div>
                     </div>
                     {!collapsed && (
                         <div className="min-w-0 flex-1">
-                            <p className="text-white font-bold text-xs truncate leading-none mb-0.5">{displayName}</p>
-                            <p className="text-white/30 text-[9px] font-black uppercase tracking-tighter truncate">{departmentName}</p>
+                            <p className="text-white font-bold text-xs truncate leading-none mb-0.5 group-hover:text-rose-400 transition-colors">{displayName}</p>
+                            <div className="flex items-center gap-1">
+                                <Shield size={8} className="text-white/20" />
+                                <p className="text-white/30 text-[9px] font-black uppercase tracking-tighter truncate">Identity Registry</p>
+                            </div>
                         </div>
                     )}
-                </div>
+                </Link>
+
                 <button
                     id="sidebar-logout-btn"
                     onClick={onLogout}
@@ -224,7 +239,7 @@ function MobileDrawer({
                                 />
                             )}
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mt-2">Institutional Admin</span>
+                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-500/90 italic mt-2 drop-shadow-sm">Institutional Admin</span>
                     </Link>
                     <button onClick={onClose} className="text-white/40 hover:text-white p-2 rounded-full hover:bg-white/5"><X size={20} /></button>
                 </div>
@@ -256,13 +271,21 @@ function MobileDrawer({
                 </nav>
 
                 <div className="px-3 py-4 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div className="flex items-center gap-3 px-4 py-2.5">
-                        <UserCircle2 size={18} className="text-white/40" strokeWidth={2.5} />
-                        <div className="min-w-0">
-                            <p className="text-white font-bold text-xs truncate leading-none mb-0.5">{displayName}</p>
-                            <p className="text-white/30 text-[9px] font-black uppercase tracking-tighter truncate">{departmentName}</p>
+                    <Link 
+                        href="/admin/profile"
+                        onClick={onClose}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-all group"
+                    >
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-xs text-white"
+                            style={{ background: BRAND.gradient }}>
+                            {displayName.slice(0, 1).toUpperCase()}
                         </div>
-                    </div>
+                        <div className="min-w-0">
+                            <p className="text-white font-bold text-xs truncate leading-none mb-0.5 group-hover:text-rose-400 transition-colors">{displayName}</p>
+                            <p className="text-white/30 text-[9px] font-black uppercase tracking-tighter truncate">Identity Registry</p>
+                        </div>
+                        <ChevronRight size={14} className="ml-auto text-white/20" />
+                    </Link>
                     <button onClick={onLogout}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white/35 hover:text-red-400 transition-all"
                         style={{ border: "1px solid transparent" }}>

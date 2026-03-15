@@ -146,10 +146,10 @@ export interface DbEvent {
     is_featured: boolean;
     institution_id: string;
     // Joined relations
-    creator: { full_name: string } | null;
+    creator: { full_name: string, avatar_url: string | null } | null;
     department: { name: string } | null;
     venue: { name: string; capacity: number } | null;
-    institution: { name: string } | null;
+    institution: { name: string; logo_url: string | null } | null;
 }
 
 /**
@@ -174,7 +174,7 @@ export async function fetchPendingEvents(institutionId: string): Promise<DbEvent
             is_archived,
             is_featured,
             institution_id,
-            creator:users!events_creator_id_fkey ( full_name ),
+            creator:users!events_creator_id_fkey ( full_name, avatar_url ),
             department:departments ( name ),
             venue:venues ( name, capacity )
         `)
@@ -212,10 +212,10 @@ export async function fetchPublicEvents(institutionId?: string): Promise<DbEvent
             is_public,
             is_featured,
             institution_id,
-            creator:users!events_creator_id_fkey ( full_name ),
+            creator:users!events_creator_id_fkey ( full_name, avatar_url ),
             department:departments ( name ),
             venue:venues ( name, capacity ),
-            institution:institutions ( name ),
+            institution:institutions ( name, logo_url ),
             registration_config
         `)
         .in("status", ["approved", "live", "completed"]);
@@ -263,7 +263,7 @@ export async function fetchDepartmentEvents(institutionId: string, filters?: {
             rejection_reason,
             archive_requested,
             archive_request_note,
-            creator:users!events_creator_id_fkey ( full_name ),
+            creator:users!events_creator_id_fkey ( full_name, avatar_url ),
             department:departments ( name ),
             venue:venues ( name, capacity )
         `)

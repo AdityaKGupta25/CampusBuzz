@@ -1,17 +1,23 @@
+
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://eeomuefujtyquhgpcmft.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlb211ZWZ1anR5cXVoZ3BjbWZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI1MjcsImV4cCI6MjA4NzUyODUyN30.JZ0BJ6uHO2kLZxpCH9G1YtrjYnsOqEEpc59PyiSuViQ'
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-async function checkTable() {
-    const { data, error } = await supabase.from('event_staff').select('*').limit(1)
-    if (error) {
-        console.error('event_staff error:', error.message)
-    } else {
-        console.log('event_staff exists, columns:', data[0] ? Object.keys(data[0]) : 'empty')
-    }
+async function checkColumns() {
+  const { data, error } = await supabase.from('event_staff').select('*').limit(1)
+  if (error) {
+    console.error(error)
+    return
+  }
+  if (data && data.length > 0) {
+    console.log('Columns in event_staff:', Object.keys(data[0]))
+    console.log('Sample data:', data[0])
+  } else {
+    console.log('No data in event_staff')
+  }
 }
 
-checkTable()
+checkColumns()

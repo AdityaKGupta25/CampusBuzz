@@ -123,6 +123,13 @@ BEGIN
         role_name = EXCLUDED.role_name,
         grant_edit_access = EXCLUDED.grant_edit_access;
 
+    -- 1b. Legacy column update (Safely attempting update if role column exists)
+    BEGIN
+        UPDATE event_staff SET role = p_role WHERE event_id = p_event_id AND student_id = p_student_id;
+    EXCEPTION WHEN OTHERS THEN
+        -- Column doesn't exist, ignore
+    END;
+
     -- 2. Create notification
     INSERT INTO notifications (user_id, title, message, type, link)
     VALUES (
@@ -130,7 +137,7 @@ BEGIN
         p_notif_title, 
         p_notif_message, 
         'info', 
-        '/student/event/' || p_event_id
+        '/faculty/event/' || p_event_id || '/manage'
     );
 END;
 $$ LANGUAGE plpgsql;

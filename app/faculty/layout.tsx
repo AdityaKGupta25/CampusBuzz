@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { useUser, type AppRole } from "@/context/UserContext";
+import { useUser, type AppRole, type UserProfile } from "@/context/UserContext";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -91,7 +91,7 @@ function getBrand(role: AppRole | undefined): BrandConfig {
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
 function Sidebar({
-    collapsed, onToggle, displayName, departmentName, role, onLogout,
+    collapsed, onToggle, displayName, departmentName, role, onLogout, user,
 }: {
     collapsed: boolean;
     onToggle: () => void;
@@ -99,6 +99,7 @@ function Sidebar({
     departmentName: string;
     role: AppRole | undefined;
     onLogout: () => void;
+    user: UserProfile | null | undefined;
 }) {
     const pathname = usePathname();
     const router = useRouter();
@@ -188,20 +189,30 @@ function Sidebar({
                 className="px-2 py-4 space-y-1 flex-shrink-0"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
             >
-                <div className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl", collapsed && "justify-center")}>
+                <Link 
+                    href="/faculty/profile"
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all hover:bg-white/5 group",
+                        collapsed && "justify-center"
+                    )}
+                >
                     <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-[10px] text-white"
-                        style={{ background: brand.gradient }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-[10px] text-white overflow-hidden"
+                        style={{ background: user?.avatar_url ? 'transparent' : brand.gradient }}
                     >
-                        {displayName.slice(0, 1).toUpperCase()}
+                        {user?.avatar_url ? (
+                            <img src={user.avatar_url} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                            displayName.slice(0, 1).toUpperCase()
+                        )}
                     </div>
                     {!collapsed && (
                         <div className="min-w-0 flex-1">
-                            <p className="text-white font-bold text-xs truncate leading-none mb-0.5">{displayName}</p>
+                            <p className="text-white font-bold text-xs truncate leading-none mb-0.5 group-hover:text-indigo-400 transition-colors">{displayName}</p>
                             <p className="text-white/30 text-[9px] font-black uppercase tracking-tighter truncate">{departmentName}</p>
                         </div>
                     )}
-                </div>
+                </Link>
                 <button
                     id="sidebar-logout-btn"
                     onClick={onLogout}
@@ -238,7 +249,7 @@ function Sidebar({
 // ─── Mobile Drawer ────────────────────────────────────────────────────────────
 
 function MobileDrawer({
-    open, onClose, displayName, departmentName, role, onLogout,
+    open, onClose, displayName, departmentName, role, onLogout, user,
 }: {
     open: boolean;
     onClose: () => void;
@@ -246,6 +257,7 @@ function MobileDrawer({
     departmentName: string;
     role: AppRole | undefined;
     onLogout: () => void;
+    user: UserProfile | null | undefined;
 }) {
     const pathname = usePathname();
     const router = useRouter();
@@ -331,12 +343,24 @@ function MobileDrawer({
                     })}
                 </nav>
 
-                <div className="px-3 py-4 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <UserCircle2 size={18} className="text-white/40" strokeWidth={2.5} />
-                    <div className="min-w-0">
-                        <p className="text-white font-bold text-xs truncate leading-none mb-0.5">{displayName}</p>
-                        <p className="text-white/30 text-[9px] font-black uppercase tracking-tighter truncate">{departmentName}</p>
-                    </div>
+                <div className="px-3 pb-8 pt-2 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <Link 
+                        href="/faculty/profile"
+                        onClick={onClose}
+                        className="flex items-center gap-4 p-3 rounded-xl group hover:bg-white/5 transition-all mb-2" 
+                    >
+                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-800 flex items-center justify-center flex-shrink-0 border border-white/10 shadow-lg">
+                            {user?.avatar_url ? (
+                                <img src={user.avatar_url} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                                <UserCircle2 size={24} className="text-white/40" strokeWidth={2.5} />
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-white font-bold text-sm truncate leading-none mb-1 group-hover:text-indigo-400 transition-colors">{displayName}</p>
+                            <p className="text-white/30 text-[10px] font-black uppercase tracking-widest truncate">{departmentName}</p>
+                        </div>
+                    </Link>
                     <button
                         onClick={onLogout}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white/35 hover:text-red-400 transition-all"
@@ -469,6 +493,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
                     departmentName={deptName}
                     role={role}
                     onLogout={() => void handleLogout()}
+                    user={user}
                 />
             )}
             {!isMissionInterface && (
@@ -479,6 +504,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
                     departmentName={deptName}
                     role={role}
                     onLogout={() => void handleLogout()}
+                    user={user}
                 />
             )}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
     UserCircle2,
@@ -15,121 +15,23 @@ import {
     Shield,
     Sparkles,
     Clock,
+    Lock,
+    Settings,
+    Bell,
+    ShieldAlert,
+    User,
+    CheckCircle2,
+    Loader2,
+    Camera,
+    Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { useUser, getInitials, getAvatarGradient } from "@/context/UserContext";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface StudentProfile {
-    full_name: string;
-    email: string;
-    role: string;
-    department: { name: string } | null;
-    created_at: string;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtJoined(iso: string) {
-    return new Date(iso).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-}
-
-function initials(name: string) {
-    return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
-
-// Gradient by name hash (deterministic but varied)
-function avatarGradient(name: string) {
-    const gradients = [
-        "linear-gradient(135deg,#4f46e5,#7c3aed)",
-        "linear-gradient(135deg,#0891b2,#0e7490)",
-        "linear-gradient(135deg,#059669,#047857)",
-        "linear-gradient(135deg,#d97706,#b45309)",
-        "linear-gradient(135deg,#db2777,#be185d)",
-    ];
-    let hash = 0;
-    for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
-    return gradients[Math.abs(hash) % gradients.length];
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
-function ProfileSkeleton() {
-    return (
-        <div className="animate-pulse space-y-4 px-4 pt-8">
-            <div className="flex flex-col items-center gap-3">
-                <div className="w-24 h-24 rounded-3xl bg-white/8" />
-                <div className="h-5 bg-white/10 rounded-xl w-40" />
-                <div className="h-3 bg-white/6 rounded-full w-28" />
-            </div>
-            <div className="mt-8 space-y-3">
-                {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-14 bg-white/4 rounded-2xl" />
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// ─── Stat Pill ────────────────────────────────────────────────────────────────
-
-function StatPill({ icon: Icon, value, label, color }: {
-    icon: React.ElementType;
-    value: number | string;
-    label: string;
-    color: string;
-}) {
-    return (
-        <div
-            className="flex-1 flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-        >
-            <Icon size={16} style={{ color }} />
-            <p className="font-black text-xl leading-none" style={{ color }}>{value}</p>
-            <p className="text-white/30 text-[10px] font-medium text-center">{label}</p>
-        </div>
-    );
-}
-
-// ─── Menu Row ─────────────────────────────────────────────────────────────────
-
-function MenuRow({ icon: Icon, label, sub, onClick, danger }: {
-    icon: React.ElementType;
-    label: string;
-    sub?: string;
-    onClick?: () => void;
-    danger?: boolean;
-}) {
-    return (
-        <button
-            onClick={onClick}
-            className={cn(
-                "w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all active:scale-[0.98]",
-                danger ? "hover:bg-red-500/8" : "hover:bg-white/4"
-            )}
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-        >
-            <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{
-                    background: danger ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.06)",
-                    border: `1px solid ${danger ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.08)"}`,
-                }}
-            >
-                <Icon size={17} className={danger ? "text-red-400" : "text-white/50"} />
-            </div>
-            <div className="flex-1 text-left min-w-0">
-                <p className={cn("text-sm font-semibold", danger ? "text-red-400" : "text-white/80")}>{label}</p>
-                {sub && <p className="text-white/30 text-xs mt-0.5 truncate">{sub}</p>}
-            </div>
-            {!danger && <ChevronRight size={14} className="text-white/20 flex-shrink-0" />}
-        </button>
-    );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
+import { useUser, getInitials } from "@/context/UserContext";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
+import { Switch } from "@/components/ui/Switch";
+import { Button } from "@/components/ui/Button";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function StudentProfilePage() {
     const router = useRouter();
@@ -140,26 +42,42 @@ export default function StudentProfilePage() {
     const [certCount, setCertCount] = useState(0);
     const [ticketCount, setTicketCount] = useState(0);
 
+    // Settings state
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [securityLoading, setSecurityLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [toastMessage, setToastMessage] = useState("");
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [notifs, setNotifs] = useState({
+        emailAlerts: true,
+        appNotifs: true,
+        weeklySummary: true
+    });
+
+    const [privacy, setPrivacy] = useState({
+        hideSocials: false
+    });
+
     const loadStats = useCallback(async () => {
         if (!profile) return;
         setLoading(true);
         setError(null);
         try {
-            // Cert count
             const { count: cc } = await supabase
                 .from("verified_ledger")
                 .select("id", { count: "exact", head: true })
                 .eq("student_id", profile.dbId);
             setCertCount(cc ?? 0);
 
-            // Ticket count
             const { count: tc } = await supabase
                 .from("registrations")
                 .select("id", { count: "exact", head: true })
                 .eq("user_id", profile.dbId)
                 .eq("status", "confirmed");
             setTicketCount(tc ?? 0);
-
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : "Failed to load stats.");
         } finally {
@@ -176,171 +94,429 @@ export default function StudentProfilePage() {
         router.push("/login");
     }
 
+    const handleSecurityUpdate = async () => {
+        if (!newPassword || newPassword !== confirmPassword) {
+            alert("Passwords must match.");
+            return;
+        }
+
+        setSecurityLoading(true);
+        try {
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+            if (error) throw error;
+            
+            setNewPassword("");
+            setConfirmPassword("");
+            setToastMessage("Security credentials updated!");
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setSecurityLoading(false);
+        }
+    };
+
+    const handleAvatarClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        try {
+            const croppedFile = await cropToSquare(file);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${profile?.dbId}_${Date.now()}.${fileExt}`;
+            const filePath = `avatars/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, croppedFile);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({ avatar_url: publicUrl })
+                .eq('id', profile?.dbId);
+
+            if (updateError) throw updateError;
+
+            await refresh();
+            setToastMessage("Identity Visual Synchronized");
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err: any) {
+            console.error(err);
+            alert("Protocol Failure: Failed to sync identity visual.");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleDeleteAvatar = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm("Terminate identity visual? This will revert to default initials.")) return;
+
+        setUploading(true);
+        try {
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({ avatar_url: null })
+                .eq('id', profile?.dbId);
+
+            if (updateError) throw updateError;
+
+            await refresh();
+            setToastMessage("Identity Visual Terminated");
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err: any) {
+            console.error(err);
+            alert("Protocol Failure: Failed to terminate visual.");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const cropToSquare = (file: File): Promise<File> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const size = Math.min(img.width, img.height);
+                    canvas.width = 400; 
+                    canvas.height = 400;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        const offsetX = (img.width - size) / 2;
+                        const offsetY = (img.height - size) / 2;
+                        ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, 400, 400);
+                    }
+                    canvas.toBlob((blob) => {
+                        if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                    }, 'image/jpeg', 0.9);
+                };
+            };
+        });
+    };
+
+    const handleGlobalSignOut = async () => {
+        if (!confirm("This will end all active sessions. Continue?")) return;
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            router.push("/login");
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const isActuallyLoading = userLoading || (loading && !profile);
     const displayError = userError || error;
 
+    if (isActuallyLoading) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                <Loader2 size={32} className="animate-spin text-indigo-500" />
+            </div>
+        );
+    }
+
+    if (!profile) return null;
 
     return (
-        <div className="font-sans" style={{ color: "white" }}>
+        <div className="min-h-screen bg-zinc-950 selection:bg-indigo-500/30 overflow-hidden relative">
+            <div className="fixed top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] translate-y-1/2 pointer-events-none" />
 
-            {/* ── Header ── */}
-            <header
-                className="sticky top-0 z-30 px-5 pt-12 pb-4 flex items-center justify-between"
-                style={{
-                    background: "rgba(9,9,15,0.94)",
-                    borderBottom: "1px solid rgba(255,255,255,0.05)",
-                    backdropFilter: "blur(20px)",
-                }}
-            >
-                <div>
-                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-0.5">
-                        {profile?.full_name ?? "Student"} | {profile?.department_name ?? "Institutional General"}
-                    </p>
-                    <h1 className="text-white font-extrabold text-2xl tracking-tight">Identity Profile</h1>
-                </div>
-                <button
-                    id="refresh-profile-btn"
-                    onClick={() => { refresh(); loadStats(); }}
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
-                >
-                    <RefreshCw size={15} className={cn("text-white/50", isActuallyLoading && "animate-spin")} />
-                </button>
-            </header>
+            <div className="max-w-6xl mx-auto px-4 py-8 lg:py-12 relative z-10">
+                <Tabs defaultValue="profile" className="w-full">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                        <div>
+                            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Authenticated Citizen</p>
+                            <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Institutional Identity</h1>
+                        </div>
 
-            {/* ── Content ── */}
-            <main className="max-w-7xl mx-auto px-5 lg:px-10 pt-6 pb-20">
-
-                {isActuallyLoading && <ProfileSkeleton />}
-
-                {displayError && (
-                    <div className="rounded-2xl p-4 text-sm text-red-300 max-w-lg mb-6" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}>
-                        {displayError}
+                        <TabsList className="bg-zinc-900/50 border-indigo-500/10">
+                            <TabsTrigger value="profile">
+                                <div className="flex items-center gap-2">
+                                    <User size={14} />
+                                    <span>Profile Core</span>
+                                </div>
+                            </TabsTrigger>
+                            <TabsTrigger value="settings">
+                                <div className="flex items-center gap-2">
+                                    <Settings size={14} />
+                                    <span>Control Center</span>
+                                </div>
+                            </TabsTrigger>
+                        </TabsList>
                     </div>
-                )}
 
-                {!loading && profile && (
-                    <div className="flex flex-col lg:flex-row gap-10 xl:gap-16">
-
-                        {/* ── Left Column: Identity ── */}
-                        <div className="flex-shrink-0 w-full lg:w-80 flex flex-col items-center lg:items-start gap-6">
-
-                            {/* Avatar */}
-                            <div className="relative group">
-                                <div className="absolute inset-0 blur-2xl opacity-20 transition-opacity group-hover:opacity-40" style={{ background: avatarGradient(profile.full_name) }} />
-                                <div
-                                    className="relative w-32 h-32 lg:w-40 lg:h-40 rounded-[2.5rem] flex items-center justify-center font-black text-4xl lg:text-5xl text-white shadow-2xl transition-transform hover:scale-105"
-                                    style={{ background: avatarGradient(profile.full_name) }}
+                    <TabsContent value="profile">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                            {/* Left Column: Identity Hub */}
+                            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8">
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 relative overflow-hidden shadow-2xl"
                                 >
-                                    {getInitials(profile.full_name)}
-                                </div>
-                                <div
-                                    className="absolute -bottom-2 -right-2 lg:-bottom-3 lg:-right-3 w-10 h-10 lg:w-12 lg:h-12 rounded-2xl flex items-center justify-center shadow-xl"
-                                    style={{ background: "#059669", border: "4px solid #09090f" }}
-                                    title="Verified Institutional Account"
-                                >
-                                    <Shield size={18} className="text-white" strokeWidth={2.5} />
-                                </div>
+                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+                                    
+                                    <div className="relative flex flex-col items-center text-center">
+                                        <div 
+                                            className="w-36 h-36 rounded-3xl bg-zinc-800 border-4 border-zinc-900 overflow-hidden relative shadow-2xl ring-2 ring-white/5 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500 cursor-pointer group"
+                                            onClick={handleAvatarClick}
+                                        >
+                                            {profile.avatar_url ? (
+                                                <img src={profile.avatar_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-800 text-white text-5xl font-black italic">
+                                                    {getInitials(profile.full_name)}
+                                                </div>
+                                            )}
+                                            
+                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 backdrop-blur-sm">
+                                                <Camera size={20} className="text-white" />
+                                                <span className="text-[9px] font-black text-white uppercase tracking-widest">{uploading ? "..." : "Edit Photo"}</span>
+                                            </div>
+
+                                            {uploading && (
+                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                                                    <Loader2 size={24} className="text-indigo-400 animate-spin" />
+                                                </div>
+                                            )}
+
+                                            <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg border-2 border-zinc-900 z-10">
+                                                <Shield size={18} className="text-white" />
+                                            </div>
+
+                                            {profile.avatar_url && !uploading && (
+                                                <button 
+                                                    onClick={handleDeleteAvatar} 
+                                                    className="absolute top-2 right-2 p-2 rounded-xl bg-zinc-900/80 border border-white/10 text-zinc-400 hover:text-rose-500 hover:bg-zinc-900 transition-all opacity-0 group-hover:opacity-100 shadow-xl backdrop-blur-md z-30"
+                                                    title="Remove Photo"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                            
+                                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                                        </div>
+
+                                        <div className="mb-8">
+                                            <h2 className="text-2xl font-black text-white tracking-tight uppercase italic mb-1.5">{profile.full_name}</h2>
+                                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 shadow-inner">
+                                                <GraduationCap size={14} className="text-indigo-400" />
+                                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{profile.role}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full grid grid-cols-3 gap-3">
+                                            <StudentStatBlock icon={Ticket} value={ticketCount} label="Passes" color="text-blue-400" />
+                                            <StudentStatBlock icon={Award} value={certCount} label="Secured" color="text-amber-400" />
+                                            <StudentStatBlock icon={Sparkles} value={certCount * 50} label="Karma" color="text-emerald-400" />
+                                        </div>
+
+                                        {profile.institution_name && (
+                                            <div className="w-full mt-8 p-4 rounded-2xl bg-zinc-950 border border-white/5 flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                                                    {profile.institution_logo_url ? <img src={profile.institution_logo_url} className="w-full h-full object-cover" /> : <Building2 size={16} className="text-zinc-500" />}
+                                                </div>
+                                                <div className="text-left text-wrap">
+                                                    <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">Officially affiliated with</p>
+                                                    <p className="text-xs font-bold text-white leading-tight pr-2">{profile.institution_name}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </motion.div>
                             </div>
 
-                            {/* Name & Role */}
-                            <div className="text-center lg:text-left w-full">
-                                <h2 className="text-white font-extrabold text-3xl tracking-tight mb-2">{profile.full_name}</h2>
-                                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
-                                    <span
-                                        className="text-[11px] font-black tracking-widest px-3 py-1 rounded-full uppercase"
-                                        style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", color: "#a5b4fc" }}
+                            {/* Right Column */}
+                            <div className="lg:col-span-8 space-y-8">
+                                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 shadow-xl">
+                                    <div className="flex items-center gap-3 mb-8 opacity-80"><Building2 size={16} className="text-indigo-500" /><h3 className="text-xs font-black text-indigo-500 uppercase tracking-[0.2em]">Institutional Credentials</h3></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <InfoRow icon={Mail} label="University Email" value={profile.email} />
+                                        <InfoRow icon={Building2} label="Primary Department" value={profile.department_name || "General"} verified />
+                                        <InfoRow icon={Clock} label="Enrolment Date" value={new Date(profile.created_at).toLocaleDateString()} />
+                                        <InfoRow icon={Shield} label="Account Integrity" value="Fully Verified" accent="text-emerald-500" />
+                                    </div>
+                                </motion.section>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 shadow-xl flex flex-col items-center text-center justify-center group overflow-hidden relative">
+                                        <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <Ticket className="w-12 h-12 text-indigo-500 mb-4 group-hover:rotate-12 transition-transform duration-500" />
+                                        <h4 className="text-lg font-black text-white italic uppercase tracking-tighter mb-2">My Event Passes</h4>
+                                        <p className="text-xs font-bold text-zinc-500 mb-6">Manage your digital tickets and entry codes</p>
+                                        <Button onClick={() => router.push("/student/my-tickets")} className="bg-white/5 border border-white/10 hover:bg-white/10 text-white uppercase text-[10px] font-black tracking-widest h-10 px-6 rounded-xl">View Inventory</Button>
+                                    </motion.section>
+
+                                    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 shadow-xl flex flex-col items-center text-center justify-center group overflow-hidden relative">
+                                        <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <Award className="w-12 h-12 text-amber-500 mb-4 group-hover:-rotate-12 transition-transform duration-500" />
+                                        <h4 className="text-lg font-black text-white italic uppercase tracking-tighter mb-2">Verified Ledger</h4>
+                                        <p className="text-xs font-bold text-zinc-500 mb-6">Certificates secured on the ledger</p>
+                                        <Button onClick={() => router.push("/student/achievements")} className="bg-white/5 border border-white/10 hover:bg-white/10 text-white uppercase text-[10px] font-black tracking-widest h-10 px-6 rounded-xl">Check Ledger</Button>
+                                    </motion.section>
+                                </div>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="settings">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                            {/* Left Column Decor */}
+                            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8">
+                                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="bg-gradient-to-br from-zinc-900 to-zinc-950 rounded-[2.5rem] border border-white/5 p-8 shadow-2xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700 text-indigo-500"><Settings size={180} /></div>
+                                    <h2 className="text-3xl font-black text-white italic tracking-tighter mb-4 uppercase">Identity<br/>Control</h2>
+                                    <p className="text-xs font-bold text-zinc-500 leading-relaxed mb-6">Modify your security credentials, alert triggers, and privacy state to match your workflow.</p>
+                                    <div className="px-4 py-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-center gap-3">
+                                        <ShieldAlert size={14} className="text-indigo-500" />
+                                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Self-Sovereign Identity</span>
+                                    </div>
+                                </motion.div>
+                                <div className="p-2 rounded-[2rem] bg-rose-500/5 border border-rose-500/10">
+                                    <button 
+                                        onClick={() => void handleLogout()} 
+                                        className="w-full px-4 py-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 flex items-center justify-center gap-3 transition-all duration-300 group"
                                     >
-                                        {profile.role}
-                                    </span>
+                                        <LogOut size={14} className="text-rose-500 group-hover:-translate-x-0.5 transition-transform" />
+                                        <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest italic whitespace-nowrap">Logout from Portal</span>
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Bio / Meta Card */}
-                            <div className="w-full rounded-[2rem] p-6 space-y-5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                                <div>
-                                    <p className="text-[10px] font-bold tracking-widest text-white/30 uppercase mb-4">Institutional Identity</p>
+                            {/* Right Settings Columns */}
+                            <div className="lg:col-span-8 space-y-8 pb-12">
+                                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 shadow-xl">
+                                    <div className="flex items-center gap-4 mb-8">
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20 shadow-inner"><Lock size={20} /></div>
+                                        <div><h3 className="text-sm font-black text-white uppercase tracking-widest italic">Security Credentials</h3><p className="text-[10px] font-bold text-zinc-500">Rotate your institutional access passkey</p></div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <SettingsInput label="New Password" value={newPassword} onChange={setNewPassword} password />
+                                        <SettingsInput label="Confirm Passkey" value={confirmPassword} onChange={setConfirmPassword} password />
+                                    </div>
+                                    <div className="mt-8 flex justify-end">
+                                        <Button onClick={handleSecurityUpdate} disabled={securityLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white uppercase text-[10px] font-black tracking-widest h-12 px-8 rounded-xl shadow-lg shadow-indigo-500/20">
+                                            {securityLoading ? <Loader2 size={16} className="animate-spin" /> : "Update Security Passkey"}
+                                        </Button>
+                                    </div>
+                                </motion.section>
+
+                                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 shadow-xl">
+                                    <div className="flex items-center gap-4 mb-8">
+                                        <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 border border-purple-500/20 shadow-inner"><Bell size={20} /></div>
+                                        <div><h3 className="text-sm font-black text-white uppercase tracking-widest italic">Signal Logic</h3><p className="text-[10px] font-bold text-zinc-500">How the campus ecosystem alerts you</p></div>
+                                    </div>
                                     <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                                                <GraduationCap size={14} className="text-white/50" />
+                                        <SettingToggle checked={notifs.emailAlerts} onChange={(v:any) => setNotifs({...notifs, emailAlerts: v})} label="Email Alerts for New Missions" sub="Get immediate pings for upcoming events and opportunities." />
+                                        <SettingToggle checked={notifs.appNotifs} onChange={(v:any) => setNotifs({...notifs, appNotifs: v})} label="In-app Event Updates" sub="Stay updated on ticket availability and status changes." />
+                                        <SettingToggle checked={notifs.weeklySummary} onChange={(v:any) => setNotifs({...notifs, weeklySummary: v})} label="Weekly Campus Digest" sub="A Sunday summary of your ranking and activity." />
+                                    </div>
+                                </motion.section>
+
+                                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 shadow-xl">
+                                    <div className="flex items-center gap-4 mb-8">
+                                        <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 border border-white/5 shadow-inner"><Shield size={20} /></div>
+                                        <div><h3 className="text-sm font-black text-white uppercase tracking-widest italic">Privacy & Identity State</h3><p className="text-[10px] font-bold text-zinc-500">Manage your institutional visibility layers</p></div>
+                                    </div>
+                                    <div className="space-y-8">
+                                        <SettingToggle checked={privacy.hideSocials} onChange={(v:any) => setPrivacy({...privacy, hideSocials: v})} label="Hide Professional Links from Peers" sub="Restrict visibility of your social profiles to only Faculty/Admin." />
+                                        
+                                        <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-black text-rose-500 uppercase tracking-widest italic">Global Sign Out</p>
+                                                <p className="text-[10px] font-bold text-zinc-500 max-w-sm leading-relaxed">Instantly end all active sessions across all your devices.</p>
                                             </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">Department</p>
-                                                <p className="text-sm font-semibold text-white/90 truncate">{profile.department_name ?? "Independent"}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                                                <Mail size={14} className="text-white/50" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">University Email</p>
-                                                <p className="text-sm font-semibold text-white/90 truncate">{profile.email}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                                                <Clock size={14} className="text-white/50" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">Joined</p>
-                                                <p className="text-sm font-semibold text-white/90 truncate">{fmtJoined(profile.created_at)}</p>
-                                            </div>
+                                            <Button onClick={handleGlobalSignOut} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 uppercase text-[10px] font-black tracking-widest h-12 px-8 rounded-xl shrink-0 transition-all font-sans">
+                                                Sign out from all devices
+                                            </Button>
                                         </div>
                                     </div>
-                                </div>
+                                </motion.section>
                             </div>
                         </div>
+                    </TabsContent>
+                </Tabs>
+            </div>
 
-                        {/* ── Right Column: Command Center ── */}
-                        <div className="flex-1 flex flex-col gap-8 lg:pt-2">
-
-                            {/* Stats Grid */}
-                            <div>
-                                <h3 className="text-[11px] font-black tracking-widest text-white/40 uppercase mb-4 pl-2">Performance Analytics</h3>
-                                <div className="grid grid-cols-3 gap-4 lg:gap-6">
-                                    <StatPill icon={Ticket} value={ticketCount} label="Event Passes" color="#818cf8" />
-                                    <StatPill icon={Award} value={certCount} label="Certificates" color="#fbbf24" />
-                                    <StatPill icon={Sparkles} value={certCount * 50} label="Karma Points" color="#34d399" />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Navigation / Quick Links */}
-                                <div className="space-y-3">
-                                    <h3 className="text-[11px] font-black tracking-widest text-white/40 uppercase mb-4 pl-2">Portfolio Management</h3>
-                                    <MenuRow
-                                        icon={Ticket}
-                                        label="My Event Passes"
-                                        sub="View your upcoming tickets"
-                                        onClick={() => router.push("/student/my-tickets")}
-                                    />
-                                    <MenuRow
-                                        icon={Award}
-                                        label="Verified Ledger"
-                                        sub={`${certCount} credential${certCount !== 1 ? "s" : ""} secured`}
-                                        onClick={() => router.push("/student/achievements")}
-                                    />
-                                </div>
-
-                                {/* Security / Danger Zone */}
-                                <div className="space-y-3">
-                                    <h3 className="text-[11px] font-black tracking-widest text-white/40 uppercase mb-4 pl-2">Account Security</h3>
-                                    <MenuRow
-                                        icon={LogOut}
-                                        label="Secure Log Out"
-                                        sub="End current session"
-                                        danger
-                                        onClick={() => void handleLogout()}
-                                    />
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
+            <AnimatePresence>
+                {success && (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-[0_10px_40px_rgba(99,102,241,0.5)] z-[200]">
+                        <CheckCircle2 size={18} />
+                        {toastMessage}
+                    </motion.div>
                 )}
-            </main>
+            </AnimatePresence>
         </div>
     );
+}
+
+function StudentStatBlock({ icon: Icon, value, label, color }: any) {
+    return (
+        <div className="p-4 rounded-2xl bg-zinc-950/60 border border-white/5 flex flex-col items-center text-center group hover:border-white/10 transition-all shadow-inner">
+            <Icon size={14} className={cn("mb-2 group-hover:scale-110 transition-transform", color)} />
+            <p className="text-lg font-black text-white italic leading-none mb-1">{value}</p>
+            <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{label}</p>
+        </div>
+    )
+}
+
+function InfoRow({ icon: Icon, label, value, verified, accent }: any) {
+    return (
+        <div className="flex items-center gap-4 group">
+            <div className="w-10 h-10 rounded-xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-500 group-hover:text-indigo-400 group-hover:border-indigo-500/30 transition-all"><Icon size={16} /></div>
+            <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-0.5">{label}</p>
+                <div className="flex items-center gap-2">
+                    <p className={cn("text-sm font-bold truncate", accent || "text-zinc-200")}>{value}</p>
+                    {verified && <div className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[7px] font-black uppercase">Verified</div>}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function SettingsInput({ label, value, onChange, password }: any) {
+    return (
+        <div className="space-y-2 relative focus-within:scale-[1.02] transition-transform">
+            <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">{label}</label>
+            <input type={password ? "password" : "text"} value={value} onChange={(e) => onChange(e.target.value)} className="w-full h-12 bg-zinc-950/50 border border-white/5 rounded-xl px-4 text-xs font-bold text-white focus:border-indigo-500/50 outline-none transition-all shadow-inner" />
+            <div className="absolute right-4 top-9 opacity-20"><Lock size={12} /></div>
+        </div>
+    )
+}
+
+function SettingToggle({ checked, onChange, label, sub }: any) {
+    return (
+        <div className="flex items-center justify-between gap-6 p-5 rounded-2xl bg-zinc-950/20 border border-white/5 hover:bg-zinc-950/40 transition-all group shadow-sm transition-all duration-300">
+            <div className="space-y-1">
+                <p className="text-xs font-black text-zinc-200 group-hover:text-white transition-colors">{label}</p>
+                <p className="text-[10px] font-bold text-zinc-600 leading-tight pr-4">{sub}</p>
+            </div>
+            <Switch checked={checked} onCheckedChange={onChange} className="data-[state=checked]:bg-indigo-500" />
+        </div>
+    )
 }

@@ -252,8 +252,12 @@ function EventCard({
                 {/* Meta grid */}
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-5 pt-5 border-t border-zinc-800">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center flex-shrink-0 border border-zinc-800">
-                            <User size={14} className="text-white/30" />
+                        <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center flex-shrink-0 border border-zinc-800 overflow-hidden">
+                            {event.facultyAvatarUrl ? (
+                                <img src={event.facultyAvatarUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <User size={14} className="text-white/30" />
+                            )}
                         </div>
                         <div className="min-w-0">
                             <dt className="text-[10px] text-white/20 uppercase font-black tracking-widest">Faculty</dt>

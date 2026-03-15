@@ -42,6 +42,7 @@ type EventStatus = "draft" | "pending" | "approved" | "rejected" | "live" | "com
 interface FacultyEvent {
     id: string;
     title: string;
+    creator_id: string;
     status: EventStatus;
     start_time: string;
     end_time: string;
@@ -55,6 +56,7 @@ interface FacultyEvent {
     governance_note?: string | null;
     rejection_reason?: string | null;
     event_type: "standalone" | "umbrella" | "sub_event";
+    creator: { full_name: string; avatar_url: string | null } | null;
 }
 
 // Raw shape returned by Supabase for registrations(count)
@@ -398,6 +400,7 @@ function EventCard({
     userRole?: string;
 }) {
     const router = useRouter();
+    const { user } = useUser();
     const [archiving, setArchiving] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [participants, setParticipants] = useState<Participant[]>([]);
@@ -532,6 +535,16 @@ function EventCard({
                             {event.status === "review_pending" && (
                                 <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border bg-cyan-500/10 border-cyan-500/30 text-cyan-400 animate-pulse">
                                     💎 Student Work Ready
+                                </span>
+                            )}
+                            {userRole !== "admin" && user?.dbId !== event.creator_id && (
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border bg-fuchsia-500/10 border-fuchsia-500/30 text-fuchsia-400">
+                                    {event.creator?.avatar_url ? (
+                                        <img src={event.creator.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full border border-fuchsia-500/30" />
+                                    ) : (
+                                        <Zap size={10} />
+                                    )}
+                                    🤝 CO-HOSTED ({event.creator?.full_name || "Partner"})
                                 </span>
                             )}
                         </div>
@@ -940,19 +953,33 @@ function FacultyMyEventsContent() {
         setLoading(true);
         setError(null);
         try {
-            // 1. Hierarchy Logic: Exclude 'sub_event' to declutter main dashboard
-            // 2. Archive Logic: Filter by status based on toggle
+            // 1. Fetch Event IDs where user is assigned as a Host/Staff (Co-Ownership logic)
+            const { data: staffRecords } = await supabase
+                .from("event_staff")
+                .select("event_id")
+                .eq("student_id", user.dbId);
+            
+            const coHostIds = (staffRecords ?? []).map(r => r.event_id);
+
+            // 2. Build the primary Governance Query
             let query = supabase
                 .from("events")
                 .select(`
                     *,
                     registrations(count),
                     venue:venues ( name ),
-                    department:departments ( name )
+                    department:departments ( name ),
+                    creator:users!events_creator_id_fkey ( full_name, avatar_url )
                 `)
                 .eq("institution_id", institutionId)
-                .eq("creator_id", user.dbId)
                 .neq("event_type", "sub_event");
+
+            // 3. Filter: (User is Creator) OR (User is Co-Host)
+            if (coHostIds.length > 0) {
+                query = query.or(`creator_id.eq.${user.dbId},id.in.(${coHostIds.join(',')})`);
+            } else {
+                query = query.eq("creator_id", user.dbId);
+            }
 
             if (showArchived) {
                 query = query.eq("status", "archived");
@@ -970,6 +997,7 @@ function FacultyMyEventsContent() {
             const normalised: FacultyEvent[] = (data ?? []).map((row: any) => ({
                 id: row.id,
                 title: row.title,
+                creator_id: row.creator_id,
                 status: row.status as EventStatus,
                 start_time: row.start_time,
                 end_time: row.end_time,
@@ -982,7 +1010,8 @@ function FacultyMyEventsContent() {
                 is_archived: row.is_archived || false,
                 governance_note: row.governance_note,
                 rejection_reason: row.rejection_reason,
-                event_type: row.event_type
+                event_type: row.event_type,
+                creator: row.creator
             }));
 
             setEvents(normalised);

@@ -31,8 +31,8 @@ const NAV_LINKS = [
 ] as const;
 
 function Sidebar({
-    collapsed, onToggle, displayName, departmentName, onLogout,
-}: { collapsed: boolean; onToggle: () => void; displayName: string; departmentName: string; onLogout: () => void }) {
+    collapsed, onToggle, displayName, departmentName, avatarUrl, onLogout,
+}: { collapsed: boolean; onToggle: () => void; displayName: string; departmentName: string; avatarUrl: string | null; onLogout: () => void }) {
     const pathname = usePathname();
     const router = useRouter();
     const [logoError, setLogoError] = useState(false);
@@ -100,17 +100,39 @@ function Sidebar({
                 })}
             </nav>
             <div className="px-2 py-4 space-y-1 flex-shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <div className={cn("flex items-center gap-3 px-2 py-2.5 rounded-xl", collapsed && "justify-center")}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-[10px] text-white" style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
-                        {displayName.slice(0, 1).toUpperCase()}
+                <Link
+                    href="/hod/profile"
+                    className={cn(
+                        "flex items-center gap-3 px-2 py-2.5 rounded-xl transition-all cursor-pointer",
+                        collapsed && "justify-center",
+                        pathname === "/hod/profile"
+                            ? "bg-cyan-500/10 border border-cyan-500/25"
+                            : "hover:bg-white/5 border border-transparent"
+                    )}
+                    title="Governance Profile"
+                >
+                    <div className={cn(
+                        "w-7 h-7 rounded-lg flex-shrink-0 overflow-hidden",
+                        pathname === "/hod/profile" ? "ring-2 ring-cyan-500/40" : "border border-white/10"
+                    )}>
+                        {avatarUrl ? (
+                            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center font-bold text-[10px] text-white" style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
+                                {displayName.slice(0, 1).toUpperCase()}
+                            </div>
+                        )}
                     </div>
                     {!collapsed && (
                         <div className="min-w-0 flex-1 ml-1">
-                            <p className="text-white font-bold text-xs truncate leading-none mb-0.5">{displayName}</p>
+                            <p className={cn("font-bold text-xs truncate leading-none mb-0.5", pathname === "/hod/profile" ? "text-white" : "text-white/80")}>{displayName}</p>
                             <p className="text-cyan-500/60 text-[8px] font-black uppercase tracking-tighter truncate">{departmentName}</p>
                         </div>
                     )}
-                </div>
+                    {!collapsed && pathname === "/hod/profile" && (
+                        <span className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 bg-cyan-400" />
+                    )}
+                </Link>
                 <button
                     id="sidebar-logout-btn"
                     onClick={onLogout}
@@ -140,8 +162,8 @@ function Sidebar({
 }
 
 function MobileDrawer({
-    open, onClose, displayName, departmentName, onLogout,
-}: { open: boolean; onClose: () => void; displayName: string; departmentName: string; onLogout: () => void }) {
+    open, onClose, displayName, departmentName, avatarUrl, onLogout,
+}: { open: boolean; onClose: () => void; displayName: string; departmentName: string; avatarUrl: string | null; onLogout: () => void }) {
     const pathname = usePathname();
     const router = useRouter();
     const [logoError, setLogoError] = useState(false);
@@ -194,13 +216,25 @@ function MobileDrawer({
                     })}
                 </nav>
                 <div className="px-3 py-4 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div className="flex items-center gap-3 px-4 py-2.5">
-                        <UserCircle2 size={18} className="text-white/40" strokeWidth={2.5} />
+                    <Link
+                        href="/hod/profile"
+                        onClick={onClose}
+                        className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 transition-all"
+                    >
+                        <div className="w-8 h-8 rounded-lg flex-shrink-0 overflow-hidden border border-white/10">
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center font-bold text-[10px] text-white" style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
+                                    {displayName.slice(0, 1).toUpperCase()}
+                                </div>
+                            )}
+                        </div>
                         <div className="min-w-0">
                             <p className="text-white font-bold text-xs truncate leading-none mb-0.5">{displayName}</p>
                             <p className="text-cyan-500/60 text-[8px] font-black uppercase tracking-tighter truncate">{departmentName}</p>
                         </div>
-                    </div>
+                    </Link>
                     <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white/35 hover:text-red-400 transition-all" style={{ border: "1px solid transparent" }}>
                         <LogOut size={16} /><span>Logout</span>
                     </button>
@@ -283,14 +317,14 @@ export default function HODLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="flex h-screen overflow-hidden" style={{ background: "#09090f", fontFamily: "var(--font-geist-sans, sans-serif)" }}>
-            <Sidebar collapsed={collapsed} onToggle={toggleCollapse} displayName={rawName} departmentName={deptName} onLogout={() => void handleLogout()} />
+            <Sidebar collapsed={collapsed} onToggle={toggleCollapse} displayName={rawName} departmentName={deptName} avatarUrl={user?.avatar_url ?? null} onLogout={() => void handleLogout()} />
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 <TopBar onMenuClick={() => setDrawerOpen(true)} onLogout={() => void handleLogout()} />
                 <main className="flex-1 overflow-y-auto" style={{ color: "white" }}>
                     {children}
                 </main>
             </div>
-            <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} displayName={rawName} departmentName={deptName} onLogout={() => void handleLogout()} />
+            <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} displayName={rawName} departmentName={deptName} avatarUrl={user?.avatar_url ?? null} onLogout={() => void handleLogout()} />
         </div>
     );
 }

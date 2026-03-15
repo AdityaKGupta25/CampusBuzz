@@ -7,8 +7,8 @@ import {
     Timer, Users2, Medal, Award, ChevronRight, Check, Globe, User,
     Ticket, ScrollText, History, Sparkles, Layers, ArrowRight,
     MessageSquare, Handshake, Briefcase, Shirt, Gift, ChevronDown, ShoppingBag,
-    Globe as GlobeIcon, ChevronRight as ChevronRightIcon, X, Eye,
-    BarChart3, ExternalLink, FileText, Send as SendIcon, Lock as LockIcon
+    Globe as GlobeIcon, ChevronRight as ChevronRightIcon, X, Eye, Building2,
+    BarChart3, ExternalLink, FileText, Send as SendIcon, Lock as LockIcon, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -67,7 +67,7 @@ interface EventDetail {
     end_time: string;
     registered_count: number;
     banner_url: string | null;
-    creator: { full_name: string; id: string } | null;
+    creator: { full_name: string; id: string; avatar_url: string | null } | null;
     department: { name: string } | null;
     venue: { name: string; capacity: number } | null;
     club: { name: string; logo_url: string | null } | null;
@@ -90,7 +90,8 @@ interface EventDetail {
     parent_event_id?: string | null;
     reg_start_time?: string | null;
     reg_end_time?: string | null;
-    staff?: { id: string; role_name: string; role: string; student: { full_name: string; email: string; id: string } }[];
+    staff?: { id: string; role_name: string; role: string; student: { full_name: string; email: string; id: string; avatar_url: string | null } }[];
+    institution: { name: string; logo_url: string | null } | null;
 }
 
 interface FestSubEvent {
@@ -208,14 +209,14 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                         is_umbrella, event_type, is_competition, parent_event_id,
                         participation_tracks, rulebook_url, institution_id,
                         reg_start_time, reg_end_time,
-                        creator:users!events_creator_id_fkey ( id, full_name ),
+                        creator:users!events_creator_id_fkey ( id, full_name, avatar_url ),
                         department:departments ( name ),
                         venue:venues ( name, capacity ),
                         club:clubs ( name, logo_url ),
-                        staff:event_staff ( id, role, role_name, student:users ( id, full_name, email ) )
+                        institution:institutions ( name, logo_url ),
+                        staff:event_staff ( id, role, role_name, student:users ( id, full_name, email, avatar_url ) )
                     `)
-                    .eq("id", id)
-                    .eq("institution_id", institutionId)
+                    .eq("id", id) // Removed .eq("institution_id", institutionId) to allow public marketplace events
                     .single(),
                 supabase.from("event_rounds").select("*, event:events!inner(institution_id)").eq("event_id", id).eq("event.institution_id", institutionId).order("round_number"),
                 supabase.from("event_prizes")
@@ -377,7 +378,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
     // ── Register Logic ────────────────────────────────────────────────────────
     async function handleRegister() {
-        if (!event) return;
+        if (!event || isOrganizer) return;
         const now = new Date();
         const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
         const regEnd = event.reg_end_time ? new Date(event.reg_end_time) : null;
@@ -1414,10 +1415,35 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Institution Badge */}
+                                    {event.institution && (
+                                        <div className="p-7 bg-zinc-900 border border-emerald-500/20 rounded-xl flex items-center gap-5 hover:border-emerald-500/40 transition-all relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 p-2 bg-emerald-500/10 rounded-bl-xl border-l border-b border-emerald-500/20">
+                                                <ShieldCheck size={12} className="text-emerald-500" />
+                                            </div>
+                                            <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center p-2 shrink-0 shadow-lg">
+                                                {event.institution.logo_url 
+                                                    ? <img src={event.institution.logo_url} className="w-full h-full object-contain" alt="" />
+                                                    : <Building2 size={28} className="text-zinc-900" />}
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-emerald-500/70 uppercase tracking-[0.2em] mb-1">Verified Host Hub</p>
+                                                <h3 className="text-base font-extrabold text-white tracking-tight">{event.institution.name}</h3>
+                                                <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase leading-relaxed">
+                                                    Officially verified campus infrastructure & authority.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                     {event.creator && (
                                         <div className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
-                                            <div className="w-16 h-16 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
-                                                <span className="text-2xl font-black text-rose-400">{event.creator.full_name?.charAt(0) || "F"}</span>
+                                            <div className="w-16 h-16 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0 overflow-hidden">
+                                                {event.creator.avatar_url ? (
+                                                     <img src={event.creator.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-2xl font-black text-rose-400">{event.creator.full_name?.charAt(0) || "F"}</span>
+                                                )}
                                             </div>
                                             <div>
                                                 <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Event In-Charge</p>
@@ -1431,10 +1457,14 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                     )}
 
                                     {/* Student Coordinators */}
-                                    {event.staff?.filter(s => (s.role_name || s.role) === "Overall Coordinator").map(s => (
+                                    {event.staff?.filter((s: any) => (s.role_name || s.role) === "Overall Coordinator").map((s: any) => (
                                         <div key={s.id} className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
                                             <div className="w-16 h-16 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 overflow-hidden">
-                                                <span className="text-2xl font-black text-cyan-400">{s.student.full_name?.charAt(0) || "S"}</span>
+                                                {s.student.avatar_url ? (
+                                                    <img src={s.student.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-2xl font-black text-cyan-400">{s.student.full_name?.charAt(0) || "S"}</span>
+                                                )}
                                             </div>
                                             <div>
                                                 <p className="text-[9px] font-black text-cyan-500 uppercase tracking-widest mb-1">Overall Coordinator</p>
@@ -1448,13 +1478,19 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                     ))}
 
                                     {/* Other Staff (Minified view) */}
-                                    {(event.staff?.filter(s => (s.role_name || s.role) !== "Overall Coordinator") || []).length > 0 && (
+                                    {(event.staff?.filter((s: any) => (s.role_name || s.role) !== "Overall Coordinator") || []).length > 0 && (
                                         <div className="col-span-full pt-4">
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                {(event.staff?.filter(s => (s.role_name || s.role) !== "Overall Coordinator") || []).map(s => (
+                                                {(event.staff?.filter((s: any) => (s.role_name || s.role) !== "Overall Coordinator") || []).map((s: any) => (
                                                     <div key={s.id} className="p-4 bg-zinc-950/50 border border-white/5 rounded-xl flex flex-col items-center text-center gap-2">
-                                                        <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-[10px] font-black text-zinc-500">
-                                                            {s.student.full_name?.split(' ').map((n: string) => n[0]).join('')}
+                                                        <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center overflow-hidden">
+                                                            {s.student.avatar_url ? (
+                                                                <img src={s.student.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="text-[10px] font-black text-zinc-500">
+                                                                    {s.student.full_name?.split(' ').map((n: string) => n[0]).join('')}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div>
                                                             <p className="text-[9px] font-black text-white uppercase truncate px-2">{s.student.full_name}</p>
@@ -1548,49 +1584,61 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 </a>
                                             )}
 
-                                            {/* Observer sees read-only badge instead of register button */}
+                                            {/* Observer seen as read-only, Organizer sees Guard message */}
                                             {isObserver ? (
-                                                <div className="w-full h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                                                <div className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-800 text-amber-400 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
                                                     <Eye size={14} /> Institutional Observer
                                                 </div>
-                                            ) : isOrganizer ? (
-                                                <div className="w-full p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center">
-                                                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest leading-loose">
-                                                        Organizers are not eligible to participate in their own events
-                                                    </p>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {event.status !== "completed" && (
+                                                        <button
+                                                            onClick={handleRegister}
+                                                            disabled={
+                                                                isOrganizer ||
+                                                                regStatus === "registered" ||
+                                                                regStatus === "confirmed" ||
+                                                                isSoldOut ||
+                                                                regStatus === "loading" ||
+                                                                previewMode ||
+                                                                !!(event.reg_start_time && new Date() < new Date(event.reg_start_time)) ||
+                                                                !!(event.reg_end_time && new Date() > new Date(event.reg_end_time))
+                                                            }
+                                                            className={cn(
+                                                                "w-full h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                                                                (regStatus === "registered" || regStatus === "confirmed")
+                                                                    ? "bg-emerald-500 text-black shadow-xl shadow-emerald-500/20"
+                                                                    : (isOrganizer || isSoldOut || (event.reg_start_time && new Date() < new Date(event.reg_start_time)) || (event.reg_end_time && new Date() > new Date(event.reg_end_time)))
+                                                                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5"
+                                                                        : "bg-white text-black hover:bg-zinc-200 shadow-2xl shadow-white/10"
+                                                            )}
+                                                        >
+                                                            {previewMode && <><ShieldCheck size={14} /> Preview Mode</>}
+                                                            {!previewMode && regStatus === "loading" && <><Loader2 size={14} className="animate-spin" /> Loading...</>}
+                                                            {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={14} /> Registered</>}
+                                                            {isOrganizer && <><ShieldCheck size={14} /> Organizer Hub</>}
+                                                            {!previewMode && !isOrganizer && regStatus === "idle" && (event.reg_start_time && new Date() < new Date(event.reg_start_time)) && "Goes Live Soon"}
+                                                            {!previewMode && !isOrganizer && regStatus === "idle" && (event.reg_end_time && new Date() > new Date(event.reg_end_time)) && "Expired"}
+                                                            {!previewMode && !isOrganizer && regStatus === "idle" && !(event.reg_start_time && new Date() < new Date(event.reg_start_time)) && !(event.reg_end_time && new Date() > new Date(event.reg_end_time)) && !isSoldOut && (
+                                                                <><Ticket size={14} />{isComp ? "Register Now" : "Claim Pass"}</>
+                                                            )}
+                                                            {!previewMode && !isOrganizer && regStatus === "idle" && isSoldOut && "Sold Out"}
+                                                            {regStatus === "pending" && "Pending Approval"}
+                                                        </button>
+                                                    )}
+
+                                                    {isOrganizer && (
+                                                        <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
+                                                            <div className="flex items-center gap-3 text-amber-500">
+                                                                <AlertCircle size={20} />
+                                                                <p className="text-[10px] font-black uppercase tracking-widest">Organizer Access</p>
+                                                            </div>
+                                                            <p className="text-[11px] font-bold text-zinc-400 leading-relaxed italic uppercase">
+                                                                ⚠️ ORGANIZER ACCESS: As an appointed member of the event staff, you are not eligible to participate as a contestant.
+                                                            </p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ) : event.status !== "completed" && (
-                                                <button
-                                                    onClick={handleRegister}
-                                                    disabled={
-                                                        regStatus === "registered" ||
-                                                        regStatus === "confirmed" ||
-                                                        isSoldOut ||
-                                                        regStatus === "loading" ||
-                                                        previewMode ||
-                                                        !!(event.reg_start_time && new Date() < new Date(event.reg_start_time)) ||
-                                                        !!(event.reg_end_time && new Date() > new Date(event.reg_end_time))
-                                                    }
-                                                    className={cn(
-                                                        "w-full h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
-                                                        (regStatus === "registered" || regStatus === "confirmed")
-                                                            ? "bg-emerald-500 text-black shadow-xl shadow-emerald-500/20"
-                                                            : (isSoldOut || (event.reg_start_time && new Date() < new Date(event.reg_start_time)) || (event.reg_end_time && new Date() > new Date(event.reg_end_time)))
-                                                                ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5"
-                                                                : "bg-white text-black hover:bg-zinc-200 shadow-2xl shadow-white/10"
-                                                    )}
-                                                >
-                                                    {previewMode && <><ShieldCheck size={14} /> Preview Mode</>}
-                                                    {!previewMode && regStatus === "loading" && <><Loader2 size={14} className="animate-spin" /> Loading...</>}
-                                                    {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={14} /> Registered</>}
-                                                    {!previewMode && regStatus === "idle" && (event.reg_start_time && new Date() < new Date(event.reg_start_time)) && "Goes Live Soon"}
-                                                    {!previewMode && regStatus === "idle" && (event.reg_end_time && new Date() > new Date(event.reg_end_time)) && "Expired"}
-                                                    {!previewMode && regStatus === "idle" && !(event.reg_start_time && new Date() < new Date(event.reg_start_time)) && !(event.reg_end_time && new Date() > new Date(event.reg_end_time)) && !isSoldOut && (
-                                                        <><Ticket size={14} />{isComp ? "Register Now" : "Claim Pass"}</>
-                                                    )}
-                                                    {!previewMode && regStatus === "idle" && isSoldOut && "Sold Out"}
-                                                    {regStatus === "pending" && "Pending Approval"}
-                                                </button>
                                             )}
                                         </div>
 
@@ -1663,7 +1711,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
             {/* Sticky mobile action bar */}
             {
-                !previewMode && !isObserver && !isOrganizer && event.status !== "completed" && (
+                !previewMode && !isObserver && event.status !== "completed" && (
                     (() => {
                         const now = new Date();
                         const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
@@ -1676,22 +1724,23 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                 style={{ background: "linear-gradient(to top, rgba(9,9,11,0.98) 60%, transparent)", backdropFilter: "blur(16px)" }}>
                                 <button
                                     onClick={handleRegister}
-                                    disabled={!!(regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading" || isNotStarted || isClosed)}
+                                    disabled={!!(isOrganizer || regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading" || isNotStarted || isClosed)}
                                     className={cn(
                                         "w-full h-14 rounded-xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
                                         (regStatus === "registered" || regStatus === "confirmed")
                                             ? "bg-emerald-500 text-black"
-                                            : (isSoldOut || isNotStarted || isClosed)
+                                            : (isOrganizer || isSoldOut || isNotStarted || isClosed)
                                                 ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
                                                 : "bg-indigo-500 text-white shadow-xl shadow-indigo-500/30 hover:bg-indigo-400"
                                     )}
                                 >
                                     {regStatus === "loading" && <Loader2 size={16} className="animate-spin" />}
                                     {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={16} /> Registered</>}
-                                    {isNotStarted && "Registration Not Started"}
-                                    {isClosed && "Registration Closed"}
-                                    {!isNotStarted && !isClosed && regStatus === "idle" && !isSoldOut && <><Ticket size={16} />{isComp ? "Register Now" : "Get Pass"}</>}
-                                    {!isNotStarted && !isClosed && regStatus === "idle" && isSoldOut && "Sold Out"}
+                                    {isOrganizer && <><ShieldCheck size={16} /> Organizer Access</>}
+                                    {!isOrganizer && isNotStarted && "Registration Not Started"}
+                                    {!isOrganizer && isClosed && "Registration Closed"}
+                                    {!isOrganizer && !isNotStarted && !isClosed && regStatus === "idle" && !isSoldOut && <><Ticket size={16} />{isComp ? "Register Now" : "Get Pass"}</>}
+                                    {!isOrganizer && !isNotStarted && !isClosed && regStatus === "idle" && isSoldOut && "Sold Out"}
                                     {regStatus === "pending" && "Pending Approval"}
                                     {regStatus === "waitlisted" && "You're Waitlisted"}
                                 </button>

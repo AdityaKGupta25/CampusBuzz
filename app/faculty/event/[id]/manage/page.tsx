@@ -259,6 +259,7 @@ function EventManageDashboardInner() {
     const [isStaffStudent, setIsStaffStudent] = useState(false);
     const [canStudentEdit, setCanStudentEdit] = useState(false);
 
+
     // Smart Conflict States
     const [conflictStatus, setConflictStatus] = useState<ConflictStatus>({ type: 'NONE', message: '' });
     const [checkingConflict, setCheckingConflict] = useState(false);
@@ -267,6 +268,16 @@ function EventManageDashboardInner() {
     const isArchived = event?.status === "archived";
     const isLocked = event?.status === "completed" || isArchived;
     const isReadOnly = isLocked || (isStaffStudent && ['review_pending', 'pending', 'approved', 'live', 'completed', 'archived'].includes(event?.status || ''));
+
+    // ── Staff Access Guard ──
+    const [userStaffRecord, setUserStaffRecord] = useState<any>(null);
+    useEffect(() => {
+        if (eventStaff && user) {
+            const currentUserId = (user as any)?.dbId || (user as any)?.id;
+            const staffRec = eventStaff.find((s: any) => s.student?.id === currentUserId);
+            setUserStaffRecord(staffRec);
+        }
+    }, [eventStaff, user]);
 
     // Round Modal State
     const [isRoundModalOpen, setIsRoundModalOpen] = useState(false);
@@ -334,20 +345,26 @@ function EventManageDashboardInner() {
                     supabase.from("registrations").select("*, student:users(full_name, email, department:departments(name)), event:events!inner(institution_id)").in("event_id", allRelevantIds).eq("event.institution_id", institutionId),
                     supabase.from("events").select("id, title, status, start_time, end_time, registered_count, attended_count, fest_domain_id, fest_category, club_id").eq("parent_event_id", eventId).eq("institution_id", institutionId).order("start_time"),
                     supabase.from("fest_domains").select("*").eq("umbrella_event_id", eventId).order("created_at"),
-                    supabase.from("event_staff").select("*, student:student_id(id, full_name, email)").eq("event_id", eventId).order("assigned_at", { ascending: false })
+                    supabase.from("event_staff").select("*, student:student_id(id, full_name, email, role, department:departments(name))").eq("event_id", eventId).order("assigned_at", { ascending: false })
                 ]);
 
                 // Phase 4: State updates
                 const currentUserId = (user as any)?.dbId || (user as any)?.id;
-                const userStaffRecord = staffRes.data?.find(s => s.student?.id === currentUserId);
+                const userStaffRecord = staffRes.data?.find(s => 
+                    s.student_id === currentUserId || 
+                    s.student?.id === currentUserId
+                );
+                
                 const isStudent = user?.role === 'student';
+                const isCreator = eventData.creator_id === currentUserId;
 
-                if (isStudent && !userStaffRecord?.grant_edit_access) {
-                    throw new Error("Access Denied: You do not have delegate editing credentials for this mission.");
+                // Students must be either the creator or staff with edit access
+                if (isStudent && !isCreator && !userStaffRecord?.grant_edit_access) {
+                    throw new Error("Access Denied: You do not have delegate editing credentials for this mission. Please contact the Faculty In-Charge.");
                 }
 
                 setIsStaffStudent(isStudent);
-                setCanStudentEdit(!!userStaffRecord?.grant_edit_access);
+                setCanStudentEdit(isCreator || !!userStaffRecord?.grant_edit_access);
 
                 setEvent({
                     ...eventData,
@@ -1170,6 +1187,13 @@ function EventManageDashboardInner() {
 
                     {isStaffStudent && (
                         <div className="mb-12 mt-4">
+                            <button
+                                onClick={() => router.push("/student/feed")}
+                                className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-[0.2em] mb-8 group"
+                            >
+                                <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+                                Exit Editor
+                            </button>
                             <div className="flex items-center gap-3 px-2 mb-8">
                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
                                     <Zap size={14} className="text-indigo-400" />
@@ -1722,7 +1746,7 @@ function EventManageDashboardInner() {
                                         saving={saving}
                                     />
                                 )}
-                                {activeTab === "settings" && event && (
+                                {activeTab === "settings" && event && !isStaffStudent && (
                                     <SettingsTab
                                         event={event}
                                         updateEvent={updateEvent}
@@ -1744,7 +1768,7 @@ function EventManageDashboardInner() {
                                         staff={eventStaff}
                                         onRefresh={async () => {
                                             const { data, error } = await supabase.from("event_staff")
-                                                .select("*, student:student_id(id, full_name, email)")
+                                                .select("*, student:student_id(id, full_name, email, role, department:departments(name))")
                                                 .eq("event_id", eventId)
                                                 .order("assigned_at", { ascending: false });
                                             if (error) alert("Sync Error: " + error.message);
@@ -5088,48 +5112,63 @@ function DomainsTab({ eventId, domains, onRefresh, onDeleteDomain, readOnly }: {
 }
 
 function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTitle }: any) {
-    const [search, setSearch] = useState("");
-    const [searchResults, setSearchResults] = useState<any[]>([]);
-    const [selectedStudent, setSelectedStudent] = useState<any>(null);
-    const [selectedRole, setSelectedRole] = useState("Organizer");
-    const [grantEdit, setGrantEdit] = useState(false);
+    const router = useRouter();
+    const [facultySearch, setFacultySearch] = useState("");
+    const [facultyResults, setFacultyResults] = useState<any[]>([]);
+    const [studentSearch, setStudentSearch] = useState("");
+    const [studentResults, setStudentResults] = useState<any[]>([]);
     const [assigning, setAssigning] = useState(false);
     const [editingStaff, setEditingStaff] = useState<any>(null);
     const [editRole, setEditRole] = useState("");
     const [editGrant, setEditGrant] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const [selectedRoleForNewMember, setSelectedRoleForNewMember] = useState("Volunteer");
 
-    const roles = ["Organizer", "Overall Coordinator", "Co-Organizer", "Student Host", "Volunteer", "Lead Volunteer", "Tech Lead", "Creative Lead"];
+    const studentRoles = ["Organizer", "Overall Coordinator", "Co-Organizer", "Student Host", "Volunteer", "Lead Volunteer", "Tech Lead", "Creative Lead"];
+    
+    const facultyStaff = staff.filter((s: any) => s.student?.role === 'faculty' || s.student?.role === 'hod');
+    const studentStaff = staff.filter((s: any) => s.student?.role === 'student');
 
-    const handleSearch = async (query: string) => {
-        setSearch(query);
-        if (query.length < 2) { setSearchResults([]); return; }
+    const handleUserSearch = async (query: string, type: 'faculty' | 'student') => {
+        if (type === 'faculty') setFacultySearch(query); else setStudentSearch(query);
+        if (query.length < 2) {
+            if (type === 'faculty') setFacultyResults([]); else setStudentResults([]);
+            return;
+        }
+
+        const roles = type === 'faculty' ? ['faculty', 'hod'] : ['student'];
         const { data, error } = await supabase.from("users")
-            .select("id, full_name, email")
-            .eq('role', 'student')
+            .select("id, full_name, email, role, department:departments(name)")
+            .in('role', roles)
             .eq('institution_id', institutionId)
             .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
             .limit(5);
-        if (!error && data) setSearchResults(data);
+            
+        if (!error && data) {
+            if (type === 'faculty') setFacultyResults(data); else setStudentResults(data);
+            if (type === 'student') setSelectedRoleForNewMember("Volunteer");
+        }
     };
 
-    const handleAssign = async () => {
-        if (!selectedStudent) return;
+    const handleAssign = async (user: any, role: string, editAccess: boolean) => {
         setAssigning(true);
         try {
             const { error } = await supabase.rpc('assign_event_staff', {
                 p_event_id: eventId,
-                p_student_id: selectedStudent.id,
-                p_role: selectedRole,
-                p_edit_access: grantEdit,
-                p_notif_title: "New Role Assigned",
-                p_notif_message: `You have been assigned as ${selectedRole} for the event: ${eventTitle || 'Event'}.`
+                p_student_id: user.id,
+                p_role: role,
+                p_edit_access: editAccess,
+                p_notif_title: editAccess ? "💎 Mission Authorization: Blueprint Editor" : "Authorized Access: Hub Deployment",
+                p_notif_message: editAccess 
+                    ? `You have been authorized as ${role} for tactical deployment: ${eventTitle}. Access the blueprint mission now.`
+                    : `You have been authorized as ${role} for tactical deployment: ${eventTitle}.`
             });
             if (error) throw error;
             onRefresh();
-            setSearch("");
-            setSelectedStudent(null);
-            setGrantEdit(false);
+            setFacultySearch("");
+            setStudentSearch("");
+            setFacultyResults([]);
+            setStudentResults([]);
         } catch (err: any) {
             alert(err.message);
         } finally {
@@ -5137,24 +5176,31 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
         }
     };
 
-    const handleRevoke = async (studentId: string) => {
-        if (!confirm("Revoke access for this student?")) return;
-        const { error } = await supabase.from("event_staff").delete().eq("event_id", eventId).eq("student_id", studentId);
-        if (error) alert(error.message);
-        else onRefresh();
-    };
-
     const handleUpdateStaff = async () => {
         if (!editingStaff) return;
         setUpdating(true);
         try {
-            const { error } = await supabase.from("event_staff").update({
-                role: editRole,
+            const { error: updateError } = await supabase.from("event_staff").update({
                 role_name: editRole,
+                role: editRole, // Update legacy column too
                 grant_edit_access: editGrant
             }).eq("id", editingStaff.id);
-            if (error) throw error;
-            onRefresh();
+            if (updateError) throw updateError;
+
+            // 2. Automatic Notification
+            await supabase.from("notifications").insert({
+                user_id: editingStaff.student_id,
+                title: "💎 Mission Role Reconfigured",
+                message: editGrant 
+                    ? `You have been granted Event Creation rights for ${eventTitle}. Access the blueprint now.`
+                    : `Your role for ${eventTitle} has been updated to ${editRole}.`,
+                type: editGrant ? "mission" : "info",
+                link: `/faculty/event/${eventId}/manage`
+            });
+
+            // 3. Instant Refresh
+            await onRefresh();
+            router.refresh(); 
             setEditingStaff(null);
         } catch (err: any) {
             alert(err.message);
@@ -5164,165 +5210,293 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
     };
 
     return (
-        <div className="space-y-12">
-            {!readOnly && (
-                <div className="p-8 rounded-[2.5rem] bg-zinc-900/30 border border-white/5 space-y-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-white">Assign New Organizer</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="relative">
-                            <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1 mb-2 block">Search Student</label>
+        <div className="space-y-20 pb-20">
+            {/* TIER 1: FACULTY LEADERSHIP */}
+            <section className="space-y-8">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter flex items-center gap-4">
+                            Faculty Co-Hosts
+                            <div className="h-1 w-12 bg-indigo-500 rounded-full" />
+                        </h3>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-2">Strategic Oversight & Shared Institutional Control</p>
+                    </div>
+                </div>
+
+                {!readOnly && (
+                    <div className="relative group">
+                        <div className="absolute -inset-0.5 bg-indigo-500/20 rounded-[2.5rem] blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                        <div className="relative p-8 rounded-[2.5rem] bg-zinc-950 border border-indigo-500/30 flex flex-col md:flex-row gap-6 items-end">
+                            <div className="flex-1 space-y-2 w-full">
+                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Search Faculty / HOD</label>
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                    <input
+                                        type="text"
+                                        value={facultySearch}
+                                        onChange={(e) => handleUserSearch(e.target.value, 'faculty')}
+                                        placeholder="Enter name or institutional email..."
+                                        className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl pl-12 pr-6 py-4 text-sm font-bold focus:border-indigo-500/40 outline-none transition-all"
+                                    />
+                                    {facultyResults.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-3 bg-zinc-950 border border-white/10 rounded-3xl shadow-3xl overflow-hidden z-50">
+                                            {facultyResults.map(u => (
+                                                <button
+                                                    key={u.id}
+                                                    onClick={() => handleAssign(u, "Faculty Host", true)}
+                                                    className="w-full px-6 py-4 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex items-center justify-between group/item"
+                                                >
+                                                    <div>
+                                                        <p className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-3">
+                                                            {u.full_name}
+                                                            <span className="text-[9px] px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-white/5">{u.department?.name || "No Dept"}</span>
+                                                        </p>
+                                                        <p className="text-[10px] text-zinc-500 font-medium">{u.email}</p>
+                                                    </div>
+                                                    <div className="h-8 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest opacity-0 group-hover/item:opacity-100 transition-all flex items-center gap-2">
+                                                        <Plus size={12} /> Add as Host
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="h-14 px-8 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                <div className="text-center">
+                                    <p className="text-[9px] font-black uppercase tracking-widest">Default Access</p>
+                                    <p className="text-[11px] font-black text-white">EDIT_RIGHTS</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                    {facultyStaff.map((s: any) => (
+                        <div key={s.id} className="p-6 rounded-[2rem] bg-zinc-900/30 border border-white/5 flex items-center justify-between group hover:bg-zinc-900/50 transition-all">
+                            <div className="flex items-center gap-5">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs">
+                                    {s.student?.full_name?.charAt(0)}
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-3">
+                                        <p className="text-sm font-black text-white uppercase tracking-tight">{s.student?.full_name}</p>
+                                        <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-zinc-400 uppercase tracking-widest">
+                                            {s.student?.department?.name || 'GEN'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{s.role_name || 'Faculty Host'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {!readOnly && (
+                                <button
+                                    onClick={async () => {
+                                        if (!confirm("Remove this faculty host?")) return;
+                                        await supabase.from("event_staff").delete().eq("id", s.id);
+                                        onRefresh();
+                                    }}
+                                    className="p-3 rounded-xl hover:bg-rose-500/10 text-zinc-600 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                    {facultyStaff.length === 0 && (
+                        <div className="col-span-full py-12 text-center rounded-[2rem] border border-dashed border-white/5 bg-white/[0.01]">
+                            <Users size={20} className="mx-auto text-zinc-800 mb-3" />
+                            <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest italic">No Faculty Co-Hosts Assigned</p>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {/* TIER 2: STUDENT WORKFORCE */}
+            <section className="space-y-8">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter flex items-center gap-4">
+                            Student Workforce
+                            <div className="h-1 w-12 bg-zinc-700 rounded-full" />
+                        </h3>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-2">Task-Force & Operational Execution</p>
+                    </div>
+                </div>
+
+                {!readOnly && (
+                    <div className="p-8 rounded-[2.5rem] bg-zinc-900/30 border border-white/5 grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                        <div className="md:col-span-12 space-y-2 relative">
+                            <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Member Deployment</label>
                             <div className="relative">
                                 <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
                                 <input
                                     type="text"
-                                    value={search}
-                                    onChange={(e) => handleSearch(e.target.value)}
-                                    placeholder="Name or Email..."
+                                    value={studentSearch}
+                                    onChange={(e) => handleUserSearch(e.target.value, 'student')}
+                                    placeholder="Search student by name..."
                                     className="w-full bg-zinc-950/50 border border-white/5 rounded-2xl pl-12 pr-6 py-4 text-sm font-bold focus:border-cyan-500/40 outline-none transition-all"
                                 />
+                                {studentResults.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-3 bg-zinc-950 border border-white/10 rounded-3xl shadow-3xl overflow-hidden z-50">
+                                        {studentResults.map(u => (
+                                            <div
+                                                key={u.id}
+                                                className="w-full px-6 py-4 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex items-center justify-between group/item"
+                                            >
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-black text-white uppercase tracking-tight">
+                                                        {u.full_name} <span className="text-zinc-500 ml-2">— [{u.department?.name || 'N/A'}]</span>
+                                                    </p>
+                                                    <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-widest">{u.email}</p>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <select 
+                                                        value={selectedRoleForNewMember}
+                                                        onChange={(e) => setSelectedRoleForNewMember(e.target.value)}
+                                                        className="h-9 bg-zinc-900 border border-white/10 rounded-xl px-3 text-[9px] font-black uppercase tracking-widest focus:border-cyan-500 outline-none"
+                                                    >
+                                                        {studentRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                                                    </select>
+                                                    <button
+                                                        onClick={() => { handleAssign(u, selectedRoleForNewMember, false); setStudentResults([]); setStudentSearch(""); }}
+                                                        className="h-9 px-4 rounded-xl bg-cyan-500 text-black text-[9px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all flex items-center gap-2"
+                                                    >
+                                                        <Plus size={12} /> Deploy
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            {searchResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-250">
-                                    {searchResults.map(s => (
-                                        <button
-                                            key={s.id}
-                                            onClick={() => { setSelectedStudent(s); setSearchResults([]); setSearch(s.full_name); }}
-                                            className="w-full px-6 py-4 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                                        >
-                                            <p className="text-sm font-bold text-white uppercase tracking-tight">{s.full_name}</p>
-                                            <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-widest">{s.email}</p>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1 mb-2 block">Role</label>
-                                    <select
-                                        value={selectedRole}
-                                        onChange={(e) => setSelectedRole(e.target.value)}
-                                        className="w-full bg-zinc-950/50 border border-white/5 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:border-cyan-500/40 outline-none transition-all appearance-none"
-                                    >
-                                        {roles.map(r => <option key={r} value={r}>{r}</option>)}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col justify-end">
-                                    <label className="flex items-center gap-3 cursor-pointer group mb-1">
-                                        <div className="relative">
-                                            <input type="checkbox" className="sr-only" checked={grantEdit} onChange={(e) => setGrantEdit(e.target.checked)} />
-                                            <div className={cn("w-10 h-5 rounded-full transition-colors", grantEdit ? "bg-cyan-500" : "bg-zinc-800")} />
-                                            <div className={cn("absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform", grantEdit ? "translate-x-5" : "")} />
-                                        </div>
-                                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest group-hover:text-zinc-300">Grant Edit?</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleAssign}
-                                disabled={!selectedStudent || assigning}
-                                className="w-full h-11 bg-white text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
-                            >
-                                {assigning ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                                Assign Organizer
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Active Staff Registry</h3>
-                    <span className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">{staff.length} Assigned</span>
-                </div>
-                <div className="grid grid-cols-1 gap-3 pb-20">
-                    {staff.map((s: any) => (
-                        <div key={s.id} className="flex items-center justify-between p-6 rounded-3xl bg-zinc-900/20 border border-white/[0.03] group hover:border-white/10 transition-all">
-                            <div className="flex items-center gap-5">
-                                <div className="w-12 h-12 rounded-2xl bg-zinc-950 flex items-center justify-center border border-white/5 text-zinc-500 font-black tracking-tighter text-sm uppercase">
-                                    {s.student.full_name?.split(' ').map((n: string) => n[0]).join('') || '??'}
+                <div className="grid grid-cols-1 gap-3">
+                    {studentStaff.map((s: any) => (
+                        <div key={s.id} className="flex items-center justify-between p-6 rounded-[2rem] bg-zinc-900/20 border border-white/[0.03] group hover:border-white/10 transition-all">
+                            <div className="flex items-center gap-6">
+                                <div className="w-14 h-14 rounded-2xl bg-zinc-950 flex items-center justify-center border border-white/5 text-zinc-600 font-black tracking-tighter text-sm uppercase group-hover:bg-zinc-900 transition-colors">
+                                    {s.student?.full_name?.split(' ').map((n: string) => n[0]).join('')}
                                 </div>
-                                <div>
-                                    <p className="text-sm font-black text-white uppercase tracking-tight">{s.student.full_name}</p>
-                                    <div className="flex items-center gap-3 mt-1">
-                                        <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-widest">{s.student.email}</p>
-                                        <div className="w-1 h-1 rounded-full bg-zinc-700" />
-                                        <p className="text-[10px] font-black text-cyan-500 uppercase tracking-widest">{s.role_name || s.role}</p>
-                                        {s.grant_edit_access && (
-                                            <div className="flex items-center gap-1.5 text-[8px] font-black text-emerald-500 uppercase tracking-tighter bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-                                                <ShieldCheck size={10} /> Edit Rights Active
+                                <div className="space-y-1">
+                                    <p className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-3">
+                                        {s.student?.full_name}
+                                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">{s.student?.department?.name || 'GEN'}</span>
+                                    </p>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.role_name || s.role || 'Volunteer'}</p>
+                                        </div>
+                                        {s.grant_edit_access ? (
+                                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[8px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                                                <ShieldCheck size={10} /> Full Edit Access
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-800 text-zinc-600 text-[8px] font-black uppercase tracking-widest">
+                                                <Eye size={10} /> View Only
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-8">
+
+                            <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-all">
                                 {!readOnly && (
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => { setEditingStaff(s); setEditRole(s.role_name || s.role); setEditGrant(s.grant_edit_access); }} className="w-10 h-10 rounded-xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-600 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
-                                            <Edit3 size={15} />
+                                    <>
+                                        <button 
+                                            onClick={() => { 
+                                                setEditingStaff(s); 
+                                                const initialRole = s.role_name || s.role || "Volunteer";
+                                                setEditRole(initialRole); 
+                                                setEditGrant(!!s.grant_edit_access); 
+                                            }}
+                                            className="w-11 h-11 rounded-2xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-cyan-400 transition-all"
+                                        >
+                                            <Edit3 size={16} />
                                         </button>
-                                        <button onClick={async () => {
-                                            if (!confirm("Revoke access for this student?")) return;
-                                            const { error } = await supabase.from("event_staff").delete().eq("id", s.id);
-                                            if (error) alert(error.message);
-                                            else onRefresh();
-                                        }} className="w-10 h-10 rounded-xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-600 hover:text-rose-500 hover:border-rose-500/30 transition-all">
-                                            <Trash2 size={15} />
+                                        <button 
+                                            onClick={async () => { if(confirm("Revoke student assignment?")) { await supabase.from("event_staff").delete().eq("id", s.id); onRefresh(); } }}
+                                            className="w-11 h-11 rounded-2xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-rose-500 transition-all"
+                                        >
+                                            <Trash2 size={16} />
                                         </button>
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         </div>
                     ))}
-                    {staff.length === 0 && (
-                        <div className="py-16 text-center border-2 border-dashed border-white/5 rounded-[2.5rem]">
-                            <Users size={24} className="mx-auto mb-3 text-zinc-800" />
-                            <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">No staff assigned to this mission</p>
+                    {studentStaff.length === 0 && (
+                        <div className="py-20 text-center rounded-[3rem] border-2 border-dashed border-white/5 bg-white/[0.01]">
+                            <div className="w-16 h-16 rounded-3xl bg-zinc-950 flex items-center justify-center mx-auto text-zinc-800 mb-6 border border-white/5 shadow-inner">
+                                <Users size={24} />
+                            </div>
+                            <p className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.4em] italic leading-relaxed">Workforce Matrix Pending Installation</p>
                         </div>
                     )}
                 </div>
-            </div>
+            </section>
 
+            {/* Global Staff Edit Modal */}
             <AnimatePresence>
                 {editingStaff && (
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 backdrop-blur-xl bg-black/60">
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-[3rem] shadow-3xl overflow-hidden">
-                            <div className="p-10 space-y-8">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <h3 className="text-xl font-black text-white tracking-tight italic">UPDATE_ORGANIZER</h3>
-                                        <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em]">{editingStaff.student.full_name}</p>
-                                    </div>
-                                    <button onClick={() => setEditingStaff(null)} className="p-2 rounded-xl hover:bg-white/5 text-zinc-500 transition-colors">
-                                        <X size={20} />
-                                    </button>
+                    <div className="fixed inset-0 z-[350] flex items-center justify-center p-6 backdrop-blur-3xl bg-black/80">
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+                            animate={{ opacity: 1, scale: 1, y: 0 }} 
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }} 
+                            className="w-full max-w-md bg-[#09090b] border border-white/10 rounded-[3rem] shadow-3xl overflow-hidden shadow-cyan-500/10"
+                        >
+                            <div className="p-12 space-y-10">
+                                <div className="space-y-2">
+                                    <p className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.4em] italic mb-2">RECONFIGURE_MEMBER</p>
+                                    <h3 className="text-2xl font-black text-white italic truncate">{editingStaff.student?.full_name}</h3>
                                 </div>
+
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Assigned Role</label>
-                                        <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl px-6 py-4 text-[11px] font-black uppercase tracking-widest focus:border-cyan-500/40 outline-none transition-all appearance-none">
-                                            {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                                        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Assigned Operational Role</label>
+                                        <select 
+                                            value={editRole} 
+                                            onChange={(e) => setEditRole(e.target.value)} 
+                                            className="w-full h-14 bg-zinc-900 border border-white/5 rounded-2xl px-6 text-[11px] font-black uppercase tracking-widest focus:border-cyan-500/40 outline-none transition-all appearance-none"
+                                        >
+                                            {editingStaff.student?.role === 'student' 
+                                                ? studentRoles.map(r => <option key={r} value={r}>{r}</option>)
+                                                : <option value="Faculty Host">Faculty Host</option>
+                                            }
                                         </select>
                                     </div>
-                                    <div className="p-6 rounded-2xl bg-zinc-900/50 border border-white/5 flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-black text-white uppercase tracking-widest">Edit Privileges</p>
-                                            <p className="text-[9px] text-zinc-500 font-medium uppercase">Allow student to modify event data</p>
+
+                                    {editingStaff.student?.role === 'student' && (
+                                        <div className="p-8 rounded-3xl bg-zinc-900/50 border border-white/5 flex items-center justify-between">
+                                            <div className="space-y-1">
+                                                <p className="text-[11px] font-black text-white uppercase tracking-widest">Edit Privileges</p>
+                                                <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-tight">Grant modification authority</p>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" className="sr-only" checked={editGrant} onChange={(e) => setEditGrant(e.target.checked)} />
+                                                <div className={cn("w-12 h-6 rounded-full transition-colors", editGrant ? "bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]" : "bg-zinc-800")} />
+                                                <div className={cn("absolute top-1 left-1.5 w-4 h-4 bg-white rounded-full transition-transform", editGrant ? "translate-x-6" : "")} />
+                                            </label>
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" className="sr-only" checked={editGrant} onChange={(e) => setEditGrant(e.target.checked)} />
-                                            <div className={cn("w-10 h-5 rounded-full transition-colors", editGrant ? "bg-cyan-500" : "bg-zinc-800")} />
-                                            <div className={cn("absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform", editGrant ? "translate-x-5" : "")} />
-                                        </label>
-                                    </div>
+                                    )}
                                 </div>
+
                                 <div className="flex gap-4">
-                                    <button onClick={() => setEditingStaff(null)} className="flex-1 h-12 bg-zinc-900 border border-white/5 rounded-2xl text-[10px] font-black uppercase text-zinc-500 hover:text-white transition-colors">Cancel</button>
-                                    <button onClick={handleUpdateStaff} disabled={updating} className="flex-[2] h-12 bg-white rounded-2xl text-[10px] font-black uppercase text-black shadow-xl transition-all active:scale-95">
-                                        {updating ? <Loader2 size={16} className="animate-spin mx-auto" /> : "Save Changes"}
+                                    <button onClick={() => setEditingStaff(null)} className="flex-1 h-14 bg-zinc-950 border border-white/5 rounded-2xl text-[10px] font-black uppercase text-zinc-600 hover:text-white transition-all">Cancel</button>
+                                    <button 
+                                        onClick={handleUpdateStaff} 
+                                        disabled={updating} 
+                                        className="flex-[2] h-14 bg-white rounded-2xl text-[10px] font-black uppercase text-black shadow-2xl hover:bg-cyan-400 transition-all active:scale-95"
+                                    >
+                                        {updating ? <Loader2 size={18} className="animate-spin mx-auto text-black" /> : "Commit Transformation"}
                                     </button>
                                 </div>
                             </div>

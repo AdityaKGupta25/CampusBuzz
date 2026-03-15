@@ -49,6 +49,7 @@ interface EscalatedEvent {
     status: string;
     department_name: string;
     creator_name: string;
+    creator_avatar_url: string | null;
     created_at: string;
     comment: string | null;
 }
@@ -242,11 +243,22 @@ function EscalationRow({ event, index }: { event: EscalatedEvent; index: number 
             {/* Info */}
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate">{event.title}</p>
-                <p className="text-[10px] text-zinc-600 mt-0.5">
-                    {event.department_name} · By {event.creator_name} · {fmtDate(event.created_at)}
-                </p>
+                <div className="flex items-center gap-2 mt-1">
+                    {event.creator_avatar_url ? (
+                        <div className="w-4 h-4 rounded-full border border-white/10 overflow-hidden shrink-0">
+                            <img src={event.creator_avatar_url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                    ) : (
+                        <div className="w-4 h-4 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[7px] font-black text-zinc-500 shrink-0 capitalize">
+                           {event.creator_name?.charAt(0) || "C"}
+                        </div>
+                    )}
+                    <p className="text-[10px] text-zinc-600 truncate">
+                        {event.department_name} · By {event.creator_name} · {fmtDate(event.created_at)}
+                    </p>
+                </div>
                 {event.comment && (
-                    <p className="text-[10px] text-amber-500/70 mt-0.5 italic truncate">
+                    <p className="text-[10px] text-amber-500/70 mt-1 italic truncate ml-6">
                         "{event.comment}"
                     </p>
                 )}
@@ -430,7 +442,7 @@ export default function AdminDashboardPage() {
                         event:events!inner(
                             id, title, risk_level, status, created_at, institution_id,
                             department:departments(name),
-                            creator:users!events_creator_id_fkey(full_name)
+                            creator:users!events_creator_id_fkey(full_name, avatar_url)
                         )
                     `)
                     .eq("event.institution_id", institutionId)
@@ -452,6 +464,7 @@ export default function AdminDashboardPage() {
                     status: a.event?.status ?? "pending",
                     department_name: a.event?.department?.name ?? "—",
                     creator_name: a.event?.creator?.full_name ?? "Unknown",
+                    creator_avatar_url: a.event?.creator?.avatar_url ?? null,
                     created_at: a.event?.created_at ?? new Date().toISOString(),
                     comment: a.comment ?? null,
                 })).filter((e: EscalatedEvent) => e.id);

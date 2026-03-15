@@ -168,13 +168,17 @@ export default function InstitutionalCommandCenter() {
                 { data: venueData, error: venueErr }
             ] = await Promise.all([
                 supabase.from("departments").select(`id, name, budget_cap, budget_used, users(count), events(count)`).eq("institution_id", institutionId).order("name"),
-                supabase.from("clubs").select(`id, name, logo_url, faculty:users!faculty_in_charge_id(full_name), department:departments(name), events(count)`).eq("institution_id", institutionId).order("name"),
+                supabase.from("clubs").select(`id, name, logo_url, faculty:users!leader_id(full_name), department:departments(name), events(count)`).eq("institution_id", institutionId).order("name"),
                 supabase.from("users").select(`id, full_name, role, email, department:departments(name), created_events:events!creator_id(count), supervised_events:events!faculty_in_charge_id(count)`).eq("institution_id", institutionId).in("role", ["faculty", "hod"]).order("full_name"),
                 supabase.from("venues").select(`id, name, capacity, venue_type, is_active, events(count)`).eq("institution_id", institutionId).order("name")
             ]);
 
             if (deptErr || clubErr || staffErr || venueErr) {
-                console.error("❌ [Admin Directory] Core Data Sync Error:", { deptErr, clubErr, staffErr, venueErr });
+                console.error("❌ [Admin Directory] Core Data Sync Error Details:");
+                if (deptErr) console.error(" - Dept Error:", deptErr);
+                if (clubErr) console.error(" - Club Error:", clubErr);
+                if (staffErr) console.error(" - Staff Error:", staffErr);
+                if (venueErr) console.error(" - Venue Error:", venueErr);
             }
 
             const { data: liveEvents } = await supabase
