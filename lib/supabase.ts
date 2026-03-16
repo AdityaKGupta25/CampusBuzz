@@ -150,6 +150,7 @@ export interface DbEvent {
     department: { name: string } | null;
     venue: { name: string; capacity: number } | null;
     institution: { name: string; logo_url: string | null } | null;
+    event_prizes: { value: number }[];
 }
 
 /**
@@ -216,7 +217,8 @@ export async function fetchPublicEvents(institutionId?: string): Promise<DbEvent
             department:departments ( name ),
             venue:venues ( name, capacity ),
             institution:institutions ( name, logo_url ),
-            registration_config
+            registration_config,
+            event_prizes ( value )
         `)
         .in("status", ["approved", "live", "completed"]);
 

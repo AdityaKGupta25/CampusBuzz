@@ -695,8 +695,8 @@ export default function CreateEventWizard() {
                                                         <MapPin size={24} />
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm font-bold text-white">No active venues found</p>
-                                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Registry is currently empty</p>
+                                                        <p className="text-sm font-bold text-white">No campus venues found</p>
+                                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Please contact Admin to add venues.</p>
                                                     </div>
                                                     <button
                                                         type="button"
@@ -708,7 +708,7 @@ export default function CreateEventWizard() {
                                                                 : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700"
                                                         )}
                                                     >
-                                                        Use "To Be Decided"
+                                                        Online / Remote Platform
                                                     </button>
                                                 </div>
                                             </div>

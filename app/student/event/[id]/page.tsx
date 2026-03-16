@@ -458,7 +458,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
     return (
         /* Fix 1: Full-bleed, no max-w, bg-[#09090b] covers everything */
-        <div className="min-h-screen w-full bg-[#09090b] text-zinc-100 font-sans overflow-x-hidden relative">
+        <div className="min-h-screen w-full bg-[#09090b] text-zinc-100 font-sans relative">
 
             {/* Preview Banner */}
             {previewMode && (
@@ -588,7 +588,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
             {/* ══════════════════════════════════════════════════════════════
                 Sticky Nav bar
             ══════════════════════════════════════════════════════════════ */}
-            <nav className={cn("sticky z-[100] w-full bg-[#09090b]/85 backdrop-blur-xl border-b border-zinc-800", previewMode ? "top-8" : "top-0")}>
+            {/* ══════════════════════════════════════════════════════════════
+                Sticky Nav bar
+            ══════════════════════════════════════════════════════════════ */}
+            <nav className={cn("sticky z-[100] w-full bg-zinc-950 border-b border-zinc-800", previewMode ? "top-8" : "top-0")}>
                 <div className="w-full px-6 md:px-16 flex items-center justify-between h-14">
                     <div className="flex items-center gap-1">
                         {NAV_ITEMS.map(item => (
@@ -864,7 +867,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                         {/* ── Right Column: Sticky Sidebar ── */}
                         <div className="lg:col-span-4 relative">
-                            <div className="sticky top-32 space-y-8">
+                            <div className="sticky top-24 space-y-8">
 
                                 {/* Status Card */}
                                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 space-y-10 shadow-3xl">
@@ -943,7 +946,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                 </div>
             ) : (
                 <div className="w-full px-6 md:px-16 py-16">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start max-w-7xl mx-auto">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 max-w-7xl mx-auto">
                         {/* ── Left Column: Content ── */}
                         <div className="lg:col-span-8 space-y-32 min-w-0">
                             {/* Completed Event Logic */}
@@ -1508,7 +1511,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                         {/* ── Right Column: Sticky registration card ── */}
                         <aside className="lg:col-span-4 relative order-first lg:order-last">
 
-                            <div className="sticky top-20 space-y-5">
+                            <div className="sticky top-24 space-y-5">
 
                                 {/* Primary Registration Card */}
                                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">

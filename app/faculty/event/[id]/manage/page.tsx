@@ -340,7 +340,7 @@ function EventManageDashboardInner() {
                 const [roundsRes, prizesRes, venuesRes, clubsRes, regsRes, subEventsRes, festDomainsRes, staffRes] = await Promise.all([
                     supabase.from("event_rounds").select("*, event:events!inner(institution_id)").eq("event_id", eventId).eq("event.institution_id", institutionId).order("round_number"),
                     supabase.from("event_prizes").select("*, event:events!inner(institution_id)").eq("event_id", eventId).eq("event.institution_id", institutionId).order("position"),
-                    supabase.from("venues").select("id, name, capacity").eq("is_active", true),
+                    supabase.from("venues").select("id, name, capacity").eq("is_active", true).eq("institution_id", institutionId),
                     supabase.from("clubs").select("id, name").eq("institution_id", institutionId),
                     supabase.from("registrations").select("*, student:users(full_name, email, department:departments(name)), event:events!inner(institution_id)").in("event_id", allRelevantIds).eq("event.institution_id", institutionId),
                     supabase.from("events").select("id, title, status, start_time, end_time, registered_count, attended_count, fest_domain_id, fest_category, club_id").eq("parent_event_id", eventId).eq("institution_id", institutionId).order("start_time"),
@@ -1178,7 +1178,7 @@ function EventManageDashboardInner() {
                                     router.push(isArchived || searchParams.get("archived") === "true" ? "/faculty/my-events?archived=true" : "/faculty/my-events");
                                 }
                             }}
-                            className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-[0.2em] mb-12 group"
+                            className="flex items-center gap-3 text-zinc-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-[0.3em] mb-12 px-4 group"
                         >
                             <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
                             {event?.parent_event_id ? "Back to Fest Hub" : "Back to Dashboard"}
@@ -1205,7 +1205,7 @@ function EventManageDashboardInner() {
 
                     {/* Event Identity Header */}
                     {!loading && event && (
-                        <div className="mb-10 space-y-3 px-1">
+                        <div className="mb-10 space-y-3 px-4">
                             <h2 className="text-[11px] font-black text-white tracking-tight uppercase line-clamp-2 leading-tight italic opacity-90">{event.title}</h2>
                             <div className="flex items-center">
                                 {event.event_type === 'umbrella' && <Badge icon={<Zap size={10} />} label="Mega Fest" variant="amber" />}
@@ -1968,17 +1968,25 @@ function NavButton({ active, onClick, icon, label, loading }: { active: boolean;
         <button
             onClick={onClick}
             className={cn(
-                "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all font-bold text-[11px] uppercase tracking-widest group relative",
+                "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all font-bold text-[11px] uppercase tracking-widest group relative text-left",
                 active
                     ? "bg-white/5 text-white shadow-sm border border-white/10"
                     : "text-zinc-600 hover:text-zinc-400"
             )}
         >
-            <div className="flex items-center gap-3">
-                <div className={cn("transition-colors", active ? "text-cyan-400" : "group-hover:text-zinc-400")}>{icon}</div>
-                {label}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className={cn("w-5 flex justify-center transition-colors shrink-0", active ? "text-cyan-400" : "group-hover:text-zinc-400")}>
+                    {icon}
+                </div>
+                <span className="line-clamp-2 leading-tight flex-1">
+                    {label}
+                </span>
             </div>
-            {active && <motion.div layoutId="nav-dot" className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />}
+            {active && (
+                <div className="ml-3 shrink-0 flex items-center justify-center w-2">
+                    <motion.div layoutId="nav-dot" className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                </div>
+            )}
         </button>
     );
 }
@@ -3779,15 +3787,19 @@ function SettingsTab({
                                 )}
                             >
                                 <option value="">Online / Remote Platform</option>
-                                {venues.map((v: any) => {
-                                    const availability = venueAvailability[v.id];
-                                    return (
-                                        <option key={v.id} value={v.id} disabled={availability?.isBooked}>
-                                            {v.name.toUpperCase()} (Cap: {v.capacity})
-                                            {availability?.isBooked ? ` — 🚫 BOOKED: ${availability.eventName}` : ' — ✅ AVAILABLE'}
-                                        </option>
-                                    );
-                                })}
+                                {venues.length > 0 ? (
+                                    venues.map((v: any) => {
+                                        const availability = venueAvailability[v.id];
+                                        return (
+                                            <option key={v.id} value={v.id} disabled={availability?.isBooked}>
+                                                {v.name.toUpperCase()} (Cap: {v.capacity})
+                                                {availability?.isBooked ? ` — 🚫 BOOKED: ${availability.eventName}` : ' — ✅ AVAILABLE'}
+                                            </option>
+                                        );
+                                    })
+                                ) : (
+                                    <option disabled>No campus venues found. Please contact Admin to add venues.</option>
+                                )}
                             </select>
                             <div className="absolute right-6 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none group-focus-within/select:rotate-180 transition-transform">
                                 <ChevronDown size={18} />

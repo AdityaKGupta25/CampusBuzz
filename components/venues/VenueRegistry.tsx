@@ -21,6 +21,7 @@ import {
     Mic2,
     Zap,
     Wind,
+    AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useUser } from "@/context/UserContext";
@@ -77,6 +78,7 @@ export function VenueRegistry() {
     });
 
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
 
     const loadVenues = useCallback(async () => {
         if (!user?.institution_id) return;
@@ -101,7 +103,12 @@ export function VenueRegistry() {
     }, [user?.institution_id, loadVenues]);
 
     const handleSave = async () => {
-        if (!formData.name || !formData.capacity || !user?.institution_id) return;
+        setFormError(null);
+        if (!formData.name || !formData.capacity || !user?.institution_id) {
+            setFormError("Required fields are missing or identity session expired.");
+            return;
+        }
+
         setSaving(true);
         try {
             const payload = {
@@ -136,7 +143,12 @@ export function VenueRegistry() {
             });
             void loadVenues();
         } catch (err: any) {
-            alert("Failed to save venue: " + err.message);
+            console.error("Failed to save venue:", err);
+            if (err.code === "23505") {
+                setFormError("A venue with this name already exists in your institution.");
+            } else {
+                setFormError(err.message || "Failed to process venue request.");
+            }
         } finally {
             setSaving(false);
         }
@@ -204,6 +216,7 @@ export function VenueRegistry() {
                                 is_active: true,
                                 photo_url: null
                             });
+                            setFormError(null);
                             setIsModalOpen(true);
                         }}
                         className="h-12 px-8 rounded-2xl bg-cyan-600 text-white text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 hover:bg-cyan-500 transition-all shadow-lg shadow-cyan-500/20 active:scale-95"
@@ -246,7 +259,7 @@ export function VenueRegistry() {
                         placeholder="Search venues by name..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-zinc-800/40 border-none rounded-xl h-12 pl-12 pr-4 text-sm focus:ring-1 focus:ring-cyan-500/50 transition-all font-medium"
+                        className="w-full bg-zinc-800/40 border-none rounded-xl h-12 pl-12 pr-4 text-sm text-white focus:ring-1 focus:ring-cyan-500/50 transition-all font-medium"
                     />
                 </div>
                 <div className="flex items-center gap-2 p-1.5 bg-zinc-800/40 rounded-xl border border-white/10 hover:border-white/20 hover:bg-zinc-800/60 transition-all group/filter">
@@ -360,6 +373,7 @@ export function VenueRegistry() {
                                                                 is_active: venue.is_active,
                                                                 photo_url: venue.photo_url
                                                             });
+                                                            setFormError(null);
                                                             setIsModalOpen(true);
                                                         }}
                                                         className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all"
@@ -408,6 +422,16 @@ export function VenueRegistry() {
 
                             {/* Modal Content */}
                             <div className="p-8 space-y-8 overflow-y-auto font-sans">
+                                {formError && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3 text-rose-500 text-xs font-bold"
+                                    >
+                                        <AlertCircle size={16} />
+                                        {formError}
+                                    </motion.div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {/* Left Column: Core Data */}
                                     <div className="space-y-6">
@@ -418,7 +442,7 @@ export function VenueRegistry() {
                                                 placeholder="e.g. Main Auditorium"
                                                 value={formData.name}
                                                 onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                                className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-cyan-500/50 transition-all placeholder:text-zinc-700 text-white"
+                                                className="w-full bg-zinc-900 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-cyan-500/50 transition-all placeholder:text-zinc-700 text-white selection:bg-cyan-500/30"
                                             />
                                         </div>
 
@@ -430,7 +454,7 @@ export function VenueRegistry() {
                                                     placeholder="500"
                                                     value={formData.capacity}
                                                     onChange={e => setFormData({ ...formData, capacity: e.target.value })}
-                                                    className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-cyan-500/50 transition-all placeholder:text-zinc-700 text-white"
+                                                    className="w-full bg-zinc-900 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-cyan-500/50 transition-all placeholder:text-zinc-700 text-white selection:bg-cyan-500/30"
                                                 />
                                             </div>
                                             <div className="space-y-2">

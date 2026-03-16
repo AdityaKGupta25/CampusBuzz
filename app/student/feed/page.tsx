@@ -29,6 +29,8 @@ import {
     Check,
     Globe,
     Shield,
+    Trash2,
+    CheckCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchPublicEvents, type DbEvent, supabase } from "@/lib/supabase";
@@ -70,6 +72,7 @@ interface CampusEvent {
     regEndTime: string | null;
     creatorAvatarUrl: string | null;
     institutionLogo: string | null;
+    prizePool: number;
 }
 
 interface Notification {
@@ -149,6 +152,7 @@ function mapDbEvent(row: DbEvent, index: number): CampusEvent {
         regEndTime: row.reg_end_time,
         creatorAvatarUrl: row.creator?.avatar_url ?? null,
         institutionLogo: row.institution?.logo_url ?? null,
+        prizePool: row.event_prizes?.reduce((acc, p) => acc + (Number(p.value) || 0), 0) ?? 0,
     };
 }
 
@@ -200,9 +204,12 @@ function Toast({ message }: { message: string }) {
 
 // ─── Notification Drawer ──────────────────────────────────────────────────────
 
-function NotifDrawer({ open, onClose, notifications, loading }: {
+function NotifDrawer({ open, onClose, notifications, loading, onDelete, onClearAll, onMarkRead }: {
     open: boolean; onClose: () => void;
     notifications: Notification[]; loading: boolean;
+    onDelete: (id: string) => void;
+    onClearAll: () => void;
+    onMarkRead: (id: string) => void;
 }) {
     const router = useRouter();
     return (
@@ -218,9 +225,19 @@ function NotifDrawer({ open, onClose, notifications, loading }: {
                         <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Inbox</p>
                         <h2 className="text-lg font-black text-white tracking-tight">Notifications</h2>
                     </div>
-                    <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
-                        <X size={16} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {notifications.length > 0 && (
+                            <button 
+                                onClick={onClearAll}
+                                className="h-9 px-3 rounded-xl bg-white/5 border border-white/8 flex items-center gap-2 text-[10px] font-black text-zinc-500 hover:text-rose-400 hover:bg-rose-500/5 hover:border-rose-500/20 transition-all uppercase tracking-widest"
+                            >
+                                <Trash2 size={12} /> Clear All
+                            </button>
+                        )}
+                        <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
+                            <X size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* List */}
@@ -236,36 +253,44 @@ function NotifDrawer({ open, onClose, notifications, loading }: {
                         </div>
                     ) : notifications.map((n) => (
                         <div key={n.id}
-                            onClick={() => { if (n.link) router.push(n.link); onClose(); }}
-                            className={cn("rounded-xl p-4 border transition-all cursor-pointer hover:border-indigo-500/30",
+                            className={cn("rounded-xl p-4 border transition-all relative group flex items-start gap-4",
                                 !n.is_read
                                     ? "bg-indigo-500/8 border-indigo-500/20"
                                     : "bg-zinc-900 border-zinc-800"
                             )}>
-                            <div className="flex items-start gap-4">
-                                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-lg",
-                                    !n.is_read ? "bg-indigo-500/20 shadow-indigo-500/10" : "bg-white/5")}>
-                                    <Bell size={14} className={!n.is_read ? "text-indigo-400" : "text-zinc-600"} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    {n.title && (
-                                        <p className={cn("text-[10px] font-black uppercase tracking-widest mb-1", !n.is_read ? "text-indigo-400" : "text-zinc-500")}>
-                                            {n.title}
-                                        </p>
-                                    )}
-                                    <p className={cn("text-xs leading-relaxed", !n.is_read ? "text-white font-bold" : "text-zinc-400 font-medium")}>
-                                        {n.message}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-tight">
-                                            {new Date(n.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                                        </p>
-                                        {n.link && <div className="w-1 h-1 rounded-full bg-zinc-700" />}
-                                        {n.link && <p className="text-[9px] text-indigo-500 font-black uppercase tracking-widest">View Mission</p>}
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { if (n.link) router.push(n.link); onMarkRead(n.id); onClose(); }}>
+                                <div className="flex items-start gap-4">
+                                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-lg",
+                                        !n.is_read ? "bg-indigo-500/20 shadow-indigo-500/10" : "bg-white/5")}>
+                                        <Bell size={14} className={!n.is_read ? "text-indigo-400" : "text-zinc-600"} />
                                     </div>
+                                    <div className="flex-1 min-w-0">
+                                        {n.title && (
+                                            <p className={cn("text-[10px] font-black uppercase tracking-widest mb-1", !n.is_read ? "text-indigo-400" : "text-zinc-500")}>
+                                                {n.title}
+                                            </p>
+                                        )}
+                                        <p className={cn("text-xs leading-relaxed", !n.is_read ? "text-white font-bold" : "text-zinc-400 font-medium")}>
+                                            {n.message}
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-tight">
+                                                {new Date(n.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                            </p>
+                                            {n.link && <div className="w-1 h-1 rounded-full bg-zinc-700" />}
+                                            {n.link && <p className="text-[9px] text-indigo-500 font-black uppercase tracking-widest">View Mission</p>}
+                                        </div>
+                                    </div>
+                                    {!n.is_read && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0 mt-2 shadow-[0_0_10px_rgba(129,140,248,0.5)]" />}
                                 </div>
-                                {!n.is_read && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0 mt-2 shadow-[0_0_10px_rgba(129,140,248,0.5)]" />}
                             </div>
+                            
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onDelete(n.id); }}
+                                className="opacity-0 group-hover:opacity-100 w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all shrink-0 mt-1"
+                            >
+                                <Trash2 size={12} />
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -303,8 +328,8 @@ function FeaturedCard({ event, onRegister, registered, forceWide }: { event: Cam
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
 
             {/* Top Row Badges */}
-            <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
-                <div>
+            <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
+                <div className="flex gap-2">
                     {event.status === "live" ? (
                         <span className="flex items-center gap-1.5 text-[9px] font-black text-white px-3 py-1.5 rounded-full bg-red-500 shadow-lg">
                             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
@@ -314,25 +339,25 @@ function FeaturedCard({ event, onRegister, registered, forceWide }: { event: Cam
                             Upcoming
                         </span>
                     )}
+                    <span className={cn("flex items-center gap-1.5 text-[9px] font-black px-3 py-1.5 rounded-full border backdrop-blur-md uppercase tracking-widest", getCategoryPillClass(event.category))}>
+                        <CatIcon size={10} /> {getCategoryLabel(event.category)}
+                    </span>
                 </div>
-                <span className={cn("flex items-center gap-1.5 text-[9px] font-black px-3 py-1.5 rounded-full border backdrop-blur-md uppercase tracking-widest", getCategoryPillClass(event.category))}>
-                    <CatIcon size={10} /> {getCategoryLabel(event.category)}
-                </span>
+
+                {event.prizePool > 0 && (
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 backdrop-blur-md border border-amber-500/30 text-amber-400 shadow-xl shadow-amber-500/10">
+                        <Trophy size={14} className="fill-amber-400/20" />
+                        <span className="text-xs font-black tracking-tight">
+                            ₹{event.prizePool.toLocaleString("en-IN")}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Content Bottom Left */}
             <div className="absolute inset-x-6 bottom-6 flex flex-col gap-1">
                 <div className="flex items-center gap-3 mb-2">
-                    {event.creatorAvatarUrl ? (
-                         <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden shrink-0">
-                             <img src={event.creatorAvatarUrl} alt="" className="w-full h-full object-cover" />
-                         </div>
-                    ) : (
-                        <div className="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-[8px] font-black text-indigo-300 shrink-0 capitalize">
-                            {event.organiser?.charAt(0) || "C"}
-                        </div>
-                    )}
-                    <span className="text-[9px] font-black text-amber-300 uppercase tracking-[0.2em] bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
+                    <span className="text-[9px] font-black text-amber-300 uppercase tracking-[0.2em] bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
                         {event.isGlobal || event.institutionId !== viewerInstitutionId ? `🏛️ ${event.collegeName}` : "🏠 My Campus"}
                     </span>
                     {event.parentEventTitle && (
@@ -425,18 +450,28 @@ function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRe
 
                 {/* Status */}
                 <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                    {event.status === "live" && (
-                        <span className="flex items-center gap-1 text-[9px] font-black text-white px-2 py-0.5 rounded-full bg-red-500 shadow-lg shadow-red-500/30 animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white inline-block" /> LIVE
+                    <div className="flex gap-1.5">
+                        {event.status === "live" && (
+                            <span className="flex items-center gap-1 text-[9px] font-black text-white px-2 py-0.5 rounded-full bg-red-500 shadow-lg shadow-red-500/30 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white inline-block" /> LIVE
+                            </span>
+                        )}
+                        {event.status === "completed" && (
+                            <span className="text-[9px] font-black text-black px-2 py-0.5 rounded-full bg-amber-400/90">DONE</span>
+                        )}
+                        <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md", getCategoryPillClass(event.category))}>
+                            {getCategoryLabel(event.category)}
                         </span>
+                    </div>
+
+                    {event.prizePool > 0 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 backdrop-blur-md border border-amber-500/30 text-amber-400">
+                            <Trophy size={11} className="fill-amber-400/20" />
+                            <span className="text-[10px] font-black tracking-tight">
+                                ₹{event.prizePool.toLocaleString("en-IN")}
+                            </span>
+                        </div>
                     )}
-                    {event.status === "completed" && (
-                        <span className="text-[9px] font-black text-black px-2 py-0.5 rounded-full bg-amber-400/90">DONE</span>
-                    )}
-                    {event.status === "approved" && <span />}
-                    <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md", getCategoryPillClass(event.category))}>
-                        {getCategoryLabel(event.category)}
-                    </span>
                 </div>
 
                 {/* College Badge */}
@@ -473,23 +508,9 @@ function EventCard({ event, onRegister, registered }: { event: CampusEvent; onRe
             </div>
 
             {/* Content */}
-            <div className="flex flex-col flex-1 p-4">
-                <div className="flex items-start gap-2 mb-2">
-                    <div className="flex-1 min-w-0 flex items-center gap-2.5 mb-2">
-                        {event.creatorAvatarUrl ? (
-                            <div className="w-5 h-5 rounded-full border border-white/5 overflow-hidden shrink-0 shadow-sm">
-                                <img src={event.creatorAvatarUrl} alt="" className="w-full h-full object-cover" />
-                            </div>
-                        ) : (
-                             <div className="w-5 h-5 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[7px] font-black text-zinc-500 shrink-0 capitalize">
-                                {event.organiser?.charAt(0) || "C"}
-                            </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest truncate mb-0.5">{event.organiser}</p>
-                            <h4 className="text-white font-extrabold text-sm leading-snug line-clamp-2">{event.title}</h4>
-                        </div>
-                    </div>
+            <div className="flex flex-col flex-1 p-5">
+                <div className="space-y-3 flex-1">
+                    <h4 className="text-white font-black text-base leading-snug line-clamp-2 tracking-tight uppercase italic">{event.title}</h4>
                 </div>
 
                 <div className="flex items-center gap-3 text-zinc-600 text-xs mb-3 mt-auto">
@@ -745,6 +766,25 @@ export default function StudentFeedPage() {
         }
     };
 
+    const handleDeleteNotif = async (id: string) => {
+        if (!userId) return;
+        setNotifications(prev => prev.filter(n => n.id !== id));
+        await supabase.from("notifications").delete().eq("id", id).eq("user_id", userId);
+    };
+
+    const handleClearAllNotifs = async () => {
+        if (!userId || !confirm("Clear all notifications?")) return;
+        setNotifications([]);
+        setNotifCount(0);
+        await supabase.from("notifications").delete().eq("user_id", userId);
+    };
+
+    const handleMarkRead = async (id: string) => {
+        if (!userId) return;
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+        await supabase.from("notifications").update({ is_read: true }).eq("id", id).eq("user_id", userId);
+    };
+
     // ── Filtering ──
     const now = new Date();
     const filteredEvents = allEvents.filter((e) => {
@@ -826,6 +866,9 @@ export default function StudentFeedPage() {
                 onClose={() => setNotifOpen(false)}
                 notifications={notifications}
                 loading={notifLoading}
+                onDelete={handleDeleteNotif}
+                onClearAll={handleClearAllNotifs}
+                onMarkRead={handleMarkRead}
             />
 
             <div className="w-full max-w-md lg:max-w-7xl mx-auto relative px-4">

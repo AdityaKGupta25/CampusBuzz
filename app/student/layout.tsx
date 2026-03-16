@@ -2,16 +2,19 @@
 
 import React from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Home, Ticket, Award, UserCircle2, Building2 } from "lucide-react";
+import { Home, Ticket, Award, UserCircle2, Building2, LayoutDashboard, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { useUser } from "@/context/UserContext";
 
 // ─── Bottom Nav items ─────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
     { href: "/student/feed", icon: Home, label: "Discover" },
+    { href: "/student/my-hub", icon: LayoutDashboard, label: "My Hub" },
     { href: "/student/my-tickets", icon: Ticket, label: "My Tickets" },
     { href: "/student/clubs", icon: Building2, label: "Clubs" },
     { href: "/student/achievements", icon: Award, label: "Achievements" },
@@ -23,7 +26,32 @@ const NAV_ITEMS = [
 function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
+    const { user } = useUser();
     const [logoError, setLogoError] = React.useState(false);
+    const [regCount, setRegCount] = React.useState(0);
+
+    React.useEffect(() => {
+        if (!user?.dbId) return;
+        const fetchCount = async () => {
+            const { count } = await supabase
+                .from("registrations")
+                .select("id, event:events!inner(status)", { count: "exact" })
+                .eq("student_id", user.dbId)
+                .in("event.status", ["live", "approved", "pending"]);
+            setRegCount(count || 0);
+        };
+        fetchCount();
+        
+        // Subscription for real-time updates
+        const channel = supabase
+            .channel("reg_count_sidebar")
+            .on("postgres_changes", { event: "*", schema: "public", table: "registrations", filter: `student_id=eq.${user.dbId}` }, () => {
+                fetchCount();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [user?.dbId]);
 
     return (
         <aside
@@ -51,6 +79,8 @@ function Sidebar() {
 
             {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
                 const active = pathname === href || pathname.startsWith(href + "/");
+                const isHub = label === "My Hub";
+
                 return (
                     <button
                         key={href}
@@ -59,7 +89,7 @@ function Sidebar() {
                     >
                         <div
                             className={cn(
-                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300",
+                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 relative",
                                 active
                                     ? "bg-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.4)]"
                                     : "bg-zinc-900 group-hover:bg-zinc-800"
@@ -72,6 +102,11 @@ function Sidebar() {
                                     active ? "text-white" : "text-white/30 group-hover:text-white"
                                 )}
                             />
+                            {isHub && regCount > 0 && (
+                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-zinc-950 shadow-lg">
+                                    {regCount}
+                                </span>
+                            )}
                         </div>
                         <span
                             className={cn(
@@ -100,6 +135,21 @@ function Sidebar() {
 function BottomNav() {
     const pathname = usePathname();
     const router = useRouter();
+    const { user } = useUser();
+    const [regCount, setRegCount] = React.useState(0);
+
+    React.useEffect(() => {
+        if (!user?.dbId) return;
+        const fetchCount = async () => {
+            const { count } = await supabase
+                .from("registrations")
+                .select("id, event:events!inner(status)", { count: "exact" })
+                .eq("student_id", user.dbId)
+                .in("event.status", ["live", "approved", "pending"]);
+            setRegCount(count || 0);
+        };
+        fetchCount();
+    }, [user?.dbId]);
 
     return (
         <nav
@@ -113,6 +163,8 @@ function BottomNav() {
         >
             {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
                 const active = pathname === href || pathname.startsWith(href + "/");
+                const isHub = label === "My Hub";
+
                 return (
                     <button
                         key={href}
@@ -130,7 +182,7 @@ function BottomNav() {
                         {/* Icon bubble */}
                         <div
                             className={cn(
-                                "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                                "w-9 h-9 rounded-xl flex items-center justify-center transition-all relative",
                                 active && "scale-110 bg-indigo-500/10"
                             )}
                         >
@@ -142,6 +194,11 @@ function BottomNav() {
                                 )}
                                 strokeWidth={active ? 2.5 : 1.8}
                             />
+                            {isHub && regCount > 0 && (
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center border border-zinc-950">
+                                    {regCount}
+                                </span>
+                            )}
                         </div>
 
                         {/* Label */}
