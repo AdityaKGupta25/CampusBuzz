@@ -1420,7 +1420,6 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                                                 onToggle={() => setOpenSection(openSection === "execution" ? null : "execution")}
                                                 isLocked={isPlanning}
                                                 isCompleted={isOutcome}
-                                                onLockClick={() => {}}
                                                 isActive={isExecution}
                                             >
                                                 <div className="space-y-0.5">
@@ -1441,7 +1440,6 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                                                 onToggle={() => setOpenSection(openSection === "outcome" ? null : "outcome")}
                                                 isLocked={isPlanning || isExecution}
                                                 isCompleted={false}
-                                                onLockClick={() => {}}
                                                 isActive={isOutcome}
                                             >
                                                 <div className="space-y-0.5">
