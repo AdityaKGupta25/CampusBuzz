@@ -46,6 +46,7 @@ interface ResultsTabProps {
     onAssignWinner: (prizeId: string, winnerId: string | null, type: "individual" | "team") => Promise<void>;
     onCompleteEvent: () => Promise<void>;
     saving: boolean;
+    readOnly?: boolean;
 }
 
 export function ResultsTab({
@@ -54,12 +55,13 @@ export function ResultsTab({
     prizes,
     onAssignWinner,
     onCompleteEvent,
-    saving
+    saving,
+    readOnly: readOnlyProp
 }: ResultsTabProps) {
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [localSaving, setLocalSaving] = useState<string | null>(null);
 
-    const isReadOnly = event.status === "completed";
+    const isReadOnly = readOnlyProp || event.status === "completed";
     const isActive = event.status === "live" || event.status === "evaluation";
 
     // Deduplicate entries if it's a team event, or list students if individual

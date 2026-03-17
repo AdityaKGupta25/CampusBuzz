@@ -483,7 +483,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
     return (
         <div
             className="flex h-screen overflow-hidden"
-            style={{ background: "#09090f", fontFamily: "var(--font-geist-sans, sans-serif)" }}
+            style={{ background: "#09090b", fontFamily: "var(--font-geist-sans, sans-serif)" }}
         >
             {!isMissionInterface && (
                 <Sidebar

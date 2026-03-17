@@ -56,6 +56,7 @@ interface FacultyEvent {
     governance_note?: string | null;
     rejection_reason?: string | null;
     event_type: "standalone" | "umbrella" | "sub_event";
+    event_subtype?: string | null;
     creator: { full_name: string; avatar_url: string | null } | null;
 }
 
@@ -154,8 +155,8 @@ function ToastList({ toasts, onDismiss }: { toasts: ToastMsg[]; onDismiss: (id: 
                     key={t.id}
                     className="flex items-start gap-3 rounded-2xl px-4 py-3.5 shadow-2xl pointer-events-auto"
                     style={{
-                        background: t.type === "success" ? "rgba(6,30,18,0.97)" : "rgba(30,6,6,0.97)",
-                        border: t.type === "success" ? "1px solid rgba(16,185,129,0.4)" : "1px solid rgba(239,68,68,0.4)",
+                        background: t.type === "success" ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                        border: t.type === "success" ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(239,68,68,0.3)",
                         backdropFilter: "blur(20px)",
                     }}
                 >
@@ -200,7 +201,7 @@ function FinalizeModal({
         >
             <div
                 className="w-full max-w-md rounded-3xl overflow-hidden"
-                style={{ background: "#0f0f1a", border: "1px solid rgba(255,255,255,0.1)" }}
+                style={{ background: "#09090b", border: "1px solid rgba(255,255,255,0.1)" }}
             >
                 {/* Header */}
                 <div className="px-6 pt-6 pb-4">
@@ -281,7 +282,7 @@ function FinalizeModal({
 // ─── Status Meta ──────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<EventStatus, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
-    draft: { label: "Draft", icon: FileText, color: "text-slate-400", bg: "bg-slate-500/10", border: "border-slate-500/20" },
+    draft: { label: "Draft", icon: FileText, color: "text-zinc-400", bg: "bg-zinc-800", border: "border-zinc-700" },
     pending: { label: "Pending", icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/25" },
     approved: { label: "Approved", icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/25" },
     rejected: { label: "Rejected", icon: XCircle, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/25" },
@@ -289,7 +290,7 @@ const STATUS_META: Record<EventStatus, { label: string; icon: React.ElementType;
     completed: { label: "Completed", icon: Shield, color: "text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/25" },
     changes_requested: { label: "Revision Required", icon: AlertCircle, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/25" },
     revision_required: { label: "Revision Required", icon: AlertCircle, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/25" },
-    archived: { label: "Archived", icon: Box, color: "text-white/40", bg: "bg-white/5", border: "border-white/10" },
+    archived: { label: "Archived", icon: Box, color: "text-white/40", bg: "bg-zinc-800", border: "border-zinc-700" },
     review_pending: { label: "Strategic Review", icon: Sparkles, color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/25" },
 };
 
@@ -453,7 +454,7 @@ function EventCard({
         <article
             className="rounded-2xl overflow-hidden transition-all duration-500"
             style={{
-                background: "rgba(255,255,255,0.025)",
+                background: "rgba(255,255,255,0.03)",
                 border: (event.status === "revision_required" || event.status === "changes_requested")
                     ? "2px solid rgba(245,158,11,0.5)"
                     : event.status === "rejected"
@@ -586,7 +587,9 @@ function EventCard({
                             )}
                         >
                             <LayoutDashboard size={12} className={event.event_type === "umbrella" ? "text-black" : "text-cyan-400"} />
-                            {event.event_type === "umbrella" ? "Manage Mega Fest Dashboard" : "Manage Event Dashboard"}
+                            {event.event_type === "umbrella" 
+                                ? (event.event_subtype === "fest" ? "Manage Mega Fest Dashboard" : "Manage Activity Hub") 
+                                : "Manage Event Dashboard"}
                             <ArrowRight size={12} className={cn(
                                 "transition-all",
                                 event.event_type === "umbrella" ? "translate-x-0" : "opacity-0 group-hover:opacity-100 group-hover:translate-x-1"

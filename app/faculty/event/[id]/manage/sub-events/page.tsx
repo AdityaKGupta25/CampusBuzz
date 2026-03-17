@@ -78,7 +78,7 @@ export default function SubEventsManagementPage() {
             const institutionId = profile.institution_id;
 
             const [eventRes, subEventsRes, domainsRes] = await Promise.all([
-                supabase.from("events").select("title, event_type").eq("id", eventId).eq("institution_id", institutionId).single(),
+                supabase.from("events").select("title, event_type, event_subtype").eq("id", eventId).eq("institution_id", institutionId).single(),
                 supabase
                     .from("events")
                     .select("id, title, status, start_time, end_time, registered_count, fest_domain_id, club_id")
@@ -162,7 +162,7 @@ export default function SubEventsManagementPage() {
                 <AlertCircle size={48} className="text-amber-500" />
                 <div className="space-y-2">
                     <h2 className="text-2xl font-black uppercase tracking-tighter">Umbrella Registry Required</h2>
-                    <p className="text-zinc-500 text-sm max-w-md">Sub-events and Domain-management are only accessible for institutional Mega Fests.</p>
+                    <p className="text-zinc-500 text-sm max-w-md">Sub-events and Domain-management are accessible for all Umbrella Events (Fests & Hubs).</p>
                 </div>
                 <button onClick={() => router.back()} className="text-indigo-400 font-bold hover:underline">Return to Dashboard</button>
             </div>
@@ -464,7 +464,7 @@ function SubEventModal({ isOpen, onClose, parentId, onSuccess, domains, initialD
                                         {initialData ? "Update Activity" : "Deploy Nested Activity"}
                                     </h3>
                                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                                        {initialData ? "Adjusting operational parameters" : "Architecting sub-events for the Mega Fest"}
+                                        {initialData ? "Adjusting operational parameters" : "Architecting sub-events for your Umbrella Registry"}
                                     </p>
                                 </div>
                                 <button onClick={onClose} className="p-3 rounded-2xl hover:bg-white/5 text-zinc-500 transition-all">

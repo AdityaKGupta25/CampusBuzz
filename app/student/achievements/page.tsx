@@ -543,58 +543,114 @@ function CertCard({ cert, idx, studentName }: { cert: Certificate; idx: number; 
 
 function LeadershipBadge({ staff, idx }: { staff: StaffRecord; idx: number }) {
     const router = useRouter();
-    const palettes = [
-        { from: "indigo-500/10", to: "indigo-500/5", border: "indigo-500/20", text: "indigo-400" },
-        { from: "emerald-500/10", to: "emerald-500/5", border: "emerald-500/20", text: "emerald-400" },
-        { from: "cyan-500/10", to: "cyan-500/5", border: "cyan-500/20", text: "cyan-400" },
-    ];
-    const p = palettes[idx % palettes.length];
 
-    const isBlueprintMission = (staff.grant_edit_access || staff.can_edit_event) && (staff.event.status === 'draft' || staff.event.status === 'pending' || staff.event.status === 'revision_required');
+    const isBlueprintMission = (staff.grant_edit_access || staff.can_edit_event) &&
+        ['draft', 'pending', 'revision_required', 'changes_requested'].includes(staff.event.status);
+    const isCompleted = staff.event.status === 'completed';
 
     return (
         <button
             onClick={() => router.push(isBlueprintMission ? `/faculty/event/${staff.event.id}/manage` : `/student/event/${staff.event.id}`)}
-            className={cn(
-                "w-full p-6 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-[0.98] group relative overflow-hidden",
-                isBlueprintMission
-                    ? "bg-gradient-to-br from-indigo-500/20 to-indigo-500/10 border-indigo-500/40 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
-                    : `bg-gradient-to-br from-${p.from} to-${p.to} border-${p.border}`
-            )}
+            className="w-full text-left rounded-3xl overflow-hidden transition-all hover:scale-[1.015] active:scale-[0.98] group relative"
+            style={isBlueprintMission ? {
+                background: "linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(67,56,202,0.08) 100%)",
+                border: "1px solid rgba(99,102,241,0.3)",
+                boxShadow: "0 4px 24px rgba(99,102,241,0.1)"
+            } : {
+                background: isCompleted
+                    ? "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(5,150,105,0.04) 100%)"
+                    : "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)",
+                border: isCompleted ? "1px solid rgba(16,185,129,0.25)" : "1px solid rgba(255,255,255,0.07)",
+            }}
         >
-            <div className="flex items-center justify-between gap-4 relative z-10">
-                <div className="flex items-center gap-5">
-                    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0", isBlueprintMission ? "bg-indigo-500/20 border-indigo-500/30" : `bg-zinc-950 border-${p.border}`)}>
-                        {isBlueprintMission ? <Sparkles size={24} className="text-white" /> : <Users size={24} className={cn(`text-${p.text}`)} />}
+            {/* Top shimmer line */}
+            <div className="absolute top-0 left-8 right-8 h-px" style={{
+                background: isBlueprintMission
+                    ? "linear-gradient(90deg, transparent, rgba(129,140,248,0.6), transparent)"
+                    : isCompleted
+                        ? "linear-gradient(90deg, transparent, rgba(52,211,153,0.4), transparent)"
+                        : "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)"
+            }} />
+
+            <div className="p-5 relative z-10">
+                {/* Category tag */}
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        {isBlueprintMission ? (
+                            <>
+                                <div className="w-5 h-5 rounded-md bg-indigo-500/30 border border-indigo-500/40 flex items-center justify-center">
+                                    <Sparkles size={10} className="text-indigo-300" />
+                                </div>
+                                <span className="text-[9px] font-black text-indigo-300 uppercase tracking-[0.25em]">Active Blueprint Mission</span>
+                            </>
+                        ) : isCompleted ? (
+                            <>
+                                <Shield size={11} className="text-emerald-400" />
+                                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.25em]">Verified Institutional Experience</span>
+                            </>
+                        ) : (
+                            <>
+                                <Briefcase size={11} className="text-zinc-500" />
+                                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.25em]">Leadership Role</span>
+                            </>
+                        )}
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            {isBlueprintMission ? <Shield size={10} className="text-indigo-300" /> : <Briefcase size={10} className={cn(`text-${p.text}`)} />}
-                            <span className={cn("text-[9px] font-black uppercase tracking-[0.2em]", isBlueprintMission ? "text-indigo-300" : `text-${p.text}`)}>
-                                {isBlueprintMission ? "Active Blueprint Mission" : "Verified Leadership"}
-                            </span>
+                    {isCompleted && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                            style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                            <CheckCircle2 size={9} className="text-emerald-400" />
+                            <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Completed</span>
                         </div>
-                        <h3 className="text-white font-black text-lg tracking-tight uppercase italic">{staff.role}</h3>
-                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-0.5">@ {staff.event.title}</p>
+                    )}
+                </div>
+
+                {/* Main content */}
+                <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border"
+                        style={isBlueprintMission ? {
+                            background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)"
+                        } : {
+                            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)"
+                        }}>
+                        {isBlueprintMission
+                            ? <Sparkles size={22} className="text-indigo-300" />
+                            : <Briefcase size={22} className={isCompleted ? "text-emerald-400" : "text-zinc-500"} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-white font-black text-lg tracking-tight uppercase italic leading-tight"
+                            style={isBlueprintMission ? { textShadow: 'none' } : {}}>
+                            {staff.role}
+                        </h3>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                            style={{ color: isBlueprintMission ? 'rgba(165,180,252,0.7)' : 'rgba(255,255,255,0.3)' }}>
+                            @ {staff.event.title}
+                        </p>
+                        <p className="text-[9px] font-bold uppercase tracking-widest mt-2"
+                            style={{ color: 'rgba(255,255,255,0.18)' }}>
+                            Institutional Leadership · CampusBuzz Verified
+                        </p>
                     </div>
                 </div>
-                {isBlueprintMission ? (
-                    <div className="px-4 py-2 rounded-xl bg-white text-black text-[9px] font-black uppercase tracking-widest flex items-center gap-2 group-hover:bg-indigo-500 group-hover:text-white transition-all shadow-xl">
-                        🚀 Complete Event Blueprint <ChevronRight size={12} />
-                    </div>
-                ) : (
-                    <div className={cn("w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center transition-all group-hover:bg-white group-hover:text-black", `text-${p.text}`)}>
-                        <ExternalLink size={16} />
-                    </div>
-                )}
-            </div>
 
-            {/* Background watermark */}
-            {isBlueprintMission ? (
-                <Sparkles size={80} className="absolute -bottom-6 -right-6 text-white/[0.04] -rotate-12 pointer-events-none" />
-            ) : (
-                <Users size={80} className="absolute -bottom-6 -right-6 text-white/[0.02] -rotate-12 pointer-events-none" />
-            )}
+                {/* CTA */}
+                <div className="mt-5 flex items-center justify-between">
+                    <div className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>
+                        {isBlueprintMission ? 'Blueprint in progress' : isCompleted ? 'View event details' : 'In progress'}
+                    </div>
+                    <div className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                        isBlueprintMission
+                            ? "bg-indigo-500 text-white group-hover:bg-indigo-400"
+                            : isCompleted
+                                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20"
+                                : "bg-white/5 border border-white/10 text-zinc-400"
+                    )}>
+                        {isBlueprintMission ? <>⚡ Edit Blueprint<ChevronRight size={11} /></> :
+                            isCompleted ? <>View Event <ChevronRight size={11} /></> :
+                                <>View <ChevronRight size={11} /></>}
+                    </div>
+                </div>
+            </div>
         </button>
     );
 }
@@ -690,6 +746,7 @@ export default function StudentAchievementsPage() {
                     role:role_name,
                     assigned_at,
                     grant_edit_access,
+                    can_edit_event,
                     event:events!inner (
                         id,
                         title,
@@ -807,18 +864,47 @@ export default function StudentAchievementsPage() {
                     />
                 ))}
 
-                {/* Leadership & Missions section */}
+                {/* Leadership & Management Portfolio section */}
                 {!loading && staffRecords.length > 0 && (
-                    <div className="space-y-6 pt-10">
-                        <div className="flex items-center gap-4 px-2">
-                            <div className="h-px flex-1 bg-white/5" />
-                            <h2 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] whitespace-nowrap">Assigned Missions & Leadership</h2>
-                            <div className="h-px flex-1 bg-white/5" />
+                    <div className="space-y-5 pt-12">
+                        {/* Section divider header */}
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)" }} />
+                            </div>
+                            <div className="relative flex justify-center">
+                                <div className="px-4 py-1.5 rounded-full flex items-center gap-2"
+                                    style={{ background: "rgba(9,9,15,1)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                                    <Briefcase size={11} className="text-indigo-400" />
+                                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.3em]">Leadership &amp; Management</span>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Category description */}
+                        <div className="px-1 flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                                <Shield size={14} className="text-indigo-400" />
+                            </div>
+                            <div>
+                                <p className="text-white font-bold text-sm leading-tight">Organizer & Staff Roles</p>
+                                <p className="text-white/30 text-[10px] leading-relaxed mt-0.5">
+                                    These roles are recorded as verified institutional experience on your CampusBuzz portfolio. Visible to recruiters and accessible via your public profile link.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Role cards */}
                         <div className="grid grid-cols-1 gap-4">
                             {staffRecords.map((staff, i) => (
                                 <LeadershipBadge key={staff.id} staff={staff} idx={i} />
                             ))}
+                        </div>
+
+                        {/* Institutional trust footer */}
+                        <div className="flex items-center justify-center gap-2 py-3">
+                            <Shield size={10} className="text-white/15" />
+                            <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest">Verified by CampusBuzz · Institutional Record</p>
                         </div>
                     </div>
                 )}

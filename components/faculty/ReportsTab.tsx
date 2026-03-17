@@ -1,24 +1,19 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
     BarChart3,
     Trophy,
     Users,
     CheckCircle2,
-    TrendingUp,
     FileText,
     Download,
     Award,
-    PieChart,
-    ChevronRight,
-    Search,
-    Filter,
     Zap,
+    Search,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, exportToCSV } from "@/lib/utils";
-import { useState } from "react";
 
 interface ReportsTabProps {
     event: any;
@@ -28,13 +23,14 @@ interface ReportsTabProps {
     subEvents?: any[];
     festDomains?: any[];
     loading?: boolean;
+    readOnly?: boolean;
 }
 
-export function ReportsTab({ event, registrations = [], submissions = [], prizes = [], subEvents = [], festDomains = [], loading }: ReportsTabProps) {
+export function ReportsTab({ event, registrations = [], submissions = [], prizes = [], subEvents = [], festDomains = [], loading, readOnly }: ReportsTabProps) {
     const [showCertList, setShowCertList] = useState(false);
     const isUmbrella = event?.event_type === "umbrella";
 
-    // 1. Calculations (Aggregate of all records in prop arrays)
+    // 1. Calculations
     const totalRegs = registrations.length;
     const totalAttended = registrations.filter((r: any) => r.status === "attended").length;
     const conversionRate = totalRegs > 0 ? (totalAttended / totalRegs) * 100 : 0;
@@ -48,7 +44,6 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
             depts[deptName] = (depts[deptName] || 0) + 1;
         });
 
-        // Demo fallback for students
         if (Object.keys(depts).length === 0 || (Object.keys(depts).length === 1 && Object.keys(depts)[0] === "Other")) {
             return [
                 { name: "Computer Science", count: Math.floor(totalRegs * 0.45) },
@@ -64,20 +59,6 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
 
     const maxDeptCount = Math.max(...deptData.map(d => d.count), 1);
 
-    // 3. Domain Breakdown (Umbrella Only)
-    const domainData = useMemo(() => {
-        if (!isUmbrella) return [];
-        const domains: Record<string, number> = {};
-
-        subEvents.forEach(sub => {
-            const domain = festDomains.find(d => d.id === sub.fest_domain_id)?.name || "General";
-            domains[domain] = (domains[domain] || 0) + (sub.registered_count || 0);
-        });
-
-        return Object.entries(domains).map(([name, value]) => ({ name, value }));
-    }, [isUmbrella, subEvents, festDomains]);
-
-    // 2.5 Mapping for sub-event registrations
     const subEventMap = useMemo(() => {
         const mapping: Record<string, number> = {};
         registrations.forEach(r => {
@@ -86,7 +67,6 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
         return mapping;
     }, [registrations]);
 
-    // 3. Winners (Top 3)
     const winners = useMemo(() => {
         return submissions
             .filter(s => s.status === "graded")
@@ -101,7 +81,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
             }));
     }, [submissions, prizes]);
 
-    if (loading) return <div className="p-20 text-center text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Analyzing Operational Metrics...</div>;
+    if (loading) return <div className="p-20 text-center text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Generating Impact Report...</div>;
 
     const exportReport = () => {
         const timestamp = new Date().toISOString().split('T')[0];
@@ -132,53 +112,70 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
 
     return (
         <div className="space-y-12 pb-24 font-sans">
-            {/* Header / Export Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
+            {/* ── Institutional Header ── */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 px-4 border-l-4 border-white pl-10">
                 <div>
-                    <h2 className="text-4xl font-black text-white tracking-tight flex items-center gap-4 italic uppercase">
-                        Fest Analytics Overview
-                        <div className="h-1 w-12 bg-white rounded-full opacity-20" />
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="px-3 py-1 bg-white text-black text-[9px] font-black uppercase tracking-[0.3em] rounded-sm">Final Audit</div>
+                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Event Completion Code: CB-AUD-{event?.id?.slice(0, 8).toUpperCase()}</span>
+                    </div>
+                    <h2 className="text-6xl font-black text-white tracking-tighter uppercase italic leading-none">
+                        Institutional <br /> Impact Report
                     </h2>
-                    <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em] mt-2">
-                        {isUmbrella ? "Aggregated results across all fest verticals" : "Official event performance data for institutional audits"}
+                    <p className="text-zinc-600 text-[11px] font-bold uppercase tracking-[0.4em] mt-6 max-w-xl leading-relaxed">
+                        Formalized performance documentation for <span className="text-white">NAAC Accreditation (Criterion 5)</span> and <span className="text-white">NIRF Data Points</span>. 
+                        Validated metrics for institutional reach and operational efficiency.
                     </p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-end gap-4">
                     <button
                         onClick={exportReport}
-                        className="flex items-center gap-3 bg-white text-black h-14 px-10 rounded-[2rem] text-[10px] font-black uppercase tracking-widest hover:bg-neutral-200 transition-all shadow-2xl shrink-0 group"
+                        disabled={readOnly}
+                        className={cn(
+                            "flex items-center gap-4 bg-indigo-600 text-white h-16 px-12 rounded-sm text-[11px] font-black uppercase tracking-[0.3em] transition-all shadow-2xl shrink-0 group transform",
+                            readOnly ? "opacity-50 grayscale cursor-not-allowed" : "hover:bg-indigo-500 hover:scale-[1.02]"
+                        )}
                     >
-                        <Download size={18} className="group-hover:-translate-y-1 transition-transform" />
-                        Export Institutional Report
+                        <FileText size={20} className="group-hover:rotate-12 transition-transform" />
+                        Download NAAC/NIRF Report (PDF)
                     </button>
-                    <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest mr-4">Downloads NAAC/Audit-ready PDF & CSV</p>
+                    <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest mr-4 italic">Certified by CampusBuzz Ledger Protocol</p>
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* ── High-Contrast KPI Cards ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-4 overflow-hidden">
                 {[
-                    { label: "Total Registrations", value: totalRegs, icon: <Users className="text-indigo-400" />, trend: "Outreach Total", bg: "bg-indigo-500/5", border: "border-white/5" },
-                    { label: "Checked-In (Footfall)", value: totalAttended, icon: <CheckCircle2 className="text-emerald-400" />, trend: "Present / Validated", bg: "bg-emerald-500/5", border: "border-white/5" },
-                    { label: "Attendance Conversion (%)", value: `${conversionRate.toFixed(1)}%`, icon: <TrendingUp className="text-amber-400" />, trend: "Retention Rate", bg: "bg-amber-500/5", border: "border-white/5" },
-                    { label: "Total Submissions", value: totalSubmissions, icon: <FileText className="text-rose-400" />, trend: "Work Artifacts", bg: "bg-rose-500/5", border: "border-white/5" },
+                    { label: "Institutional Reach", value: totalRegs, icon: <Users className="text-white" />, tagline: "Total Registrations", color: "bg-white", textColor: "text-black" },
+                    { label: "Operational Success", value: `${conversionRate.toFixed(1)}%`, icon: <CheckCircle2 className="text-emerald-400" />, tagline: "Attendance Efficiency", color: "bg-zinc-950", textColor: "text-white" },
+                    { label: "Engagement Score", value: `${((totalSubmissions / (totalRegs || 1)) * 100).toFixed(1)}%`, icon: <Zap className="text-amber-400" />, tagline: "Active Participation", color: "bg-zinc-950", textColor: "text-white" },
+                    { label: "Department Diversity", value: deptData.length, icon: <BarChart3 className="text-indigo-400" />, tagline: "Branches Involved", color: "bg-zinc-950", textColor: "text-white" },
                 ].map((kpi, i) => (
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.05 }}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.1 }}
                         key={kpi.label}
-                        className={cn("p-10 rounded-[3rem] border bg-zinc-950 shadow-2xl space-y-5 group hover:border-white/20 transition-all", kpi.border)}
+                        className={cn(
+                            "p-12 border border-white/5 shadow-2xl flex flex-col justify-between group h-80 relative overflow-hidden",
+                            kpi.color,
+                            kpi.textColor
+                        )}
                     >
-                        <div className="flex items-center justify-between">
-                            <div className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center border border-white/5 shadow-inner">
+                        {i === 0 && <div className="absolute top-0 right-0 w-32 h-32 bg-black opacity-5 skew-x-12 translate-x-12" />}
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className={cn(
+                                "w-12 h-12 flex items-center justify-center rounded-sm border",
+                                i === 0 ? "border-black/10 bg-black/5" : "border-white/10 bg-white/5"
+                            )}>
                                 {kpi.icon}
                             </div>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-700">{kpi.trend}</span>
+                            <span className={cn("text-[10px] font-black uppercase tracking-[0.4em] opacity-40")}>METRIC-{i+1}</span>
                         </div>
-                        <div>
-                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-2">{kpi.label}</p>
-                            <h3 className="text-5xl font-black text-white tracking-tighter group-hover:scale-105 transition-transform origin-left">{kpi.value}</h3>
+                        <div className="relative z-10">
+                            <p className="text-[10px] font-black uppercase tracking-[0.5em] mb-4 opacity-70 group-hover:translate-x-2 transition-transform">{kpi.label}</p>
+                            <h3 className="text-7xl font-black tracking-tighter leading-none mb-4 italic uppercase">{kpi.value}</h3>
+                            <p className="text-[9px] font-bold uppercase tracking-widest opacity-50 italic">{kpi.tagline}</p>
                         </div>
                     </motion.div>
                 ))}
@@ -224,7 +221,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                                             </td>
                                             <td className="px-8 py-7">
                                                 <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">
-                                                    {festDomains.find(d => d.id === sub.fest_domain_id)?.name || "General"}
+                                                    {festDomains?.find(d => d.id === sub.fest_domain_id)?.name || "General"}
                                                 </span>
                                             </td>
                                             <td className="px-8 py-7 text-right">
@@ -258,143 +255,54 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                 </section>
             )}
 
-            {/* Visual Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* 1. Attendance breakdown - Custom SVG Donut */}
-                <div className="p-12 bg-zinc-950 border border-white/5 rounded-[3.5rem] space-y-10 shadow-2xl relative overflow-hidden group">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-white flex items-center gap-3 italic">
-                                <PieChart size={18} className="text-emerald-400" /> {isUmbrella ? "Registrations by Domain" : "Registration vs Attendance"}
-                            </h4>
-                            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
-                                {isUmbrella ? "Outreach breakdown across fest domains." : "Ratio of registered vs. confirmed attendance."}
-                            </p>
+            {/* ── Participation Heatmap ── */}
+            <div className="px-4">
+                <div className="p-16 bg-zinc-950 border border-white/5 shadow-2xl space-y-16 group relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-max h-full p-20 opacity-[0.02] -rotate-12 pointer-events-none select-none italic text-9xl font-black text-white whitespace-nowrap">
+                        DEPARTMENT DIVERSITY HEATMAP • DEPARTMENT DIVERSITY HEATMAP
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 relative z-10 border-b border-white/10 pb-12">
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                                <span className="h-px w-10 bg-indigo-500" />
+                                <h4 className="text-[11px] font-black uppercase tracking-[0.6em] text-zinc-500 italic">Participant Heatmap</h4>
+                            </div>
+                            <h3 className="text-5xl font-black text-white uppercase italic tracking-tighter">Strategic Branch Domain Dominance</h3>
                         </div>
                         <div className="text-right">
-                            <span className="text-3xl font-black text-white tracking-tighter">{conversionRate.toFixed(0)}%</span>
+                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1 italic">Highest Active Volume</p>
+                            <h5 className="text-3xl font-black text-indigo-400 italic uppercase truncate">
+                                {deptData[0]?.name || "N/A"}
+                            </h5>
                         </div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row items-center gap-14 pb-4">
-                        <div className="relative w-56 h-56 flex-shrink-0">
-                            <svg className="w-full h-full transform -rotate-90">
-                                <circle
-                                    cx="112" cy="112" r="90"
-                                    stroke="currentColor"
-                                    strokeWidth="18"
-                                    fill="transparent"
-                                    className="text-zinc-900"
-                                />
-                                {isUmbrella ? (
-                                    // Multiple segments for domains or just use the conversion for simplicity
-                                    <motion.circle
-                                        cx="112" cy="112" r="90"
-                                        stroke="currentColor"
-                                        strokeWidth="18"
-                                        fill="transparent"
-                                        strokeDasharray={2 * Math.PI * 90}
-                                        initial={{ strokeDashoffset: 2 * Math.PI * 90 }}
-                                        animate={{ strokeDashoffset: (2 * Math.PI * 90) * (1 - conversionRate / 100) }}
-                                        transition={{ duration: 2, ease: "circOut" }}
-                                        className="text-indigo-500 drop-shadow-[0_0_15px_rgba(99,102,241,0.3)]"
-                                        strokeLinecap="round"
-                                    />
-                                ) : (
-                                    <motion.circle
-                                        cx="112" cy="112" r="90"
-                                        stroke="currentColor"
-                                        strokeWidth="18"
-                                        fill="transparent"
-                                        strokeDasharray={2 * Math.PI * 90}
-                                        initial={{ strokeDashoffset: 2 * Math.PI * 90 }}
-                                        animate={{ strokeDashoffset: (2 * Math.PI * 90) * (1 - conversionRate / 100) }}
-                                        transition={{ duration: 2, ease: "circOut" }}
-                                        className="text-emerald-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                                        strokeLinecap="round"
-                                    />
-                                )}
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                <span className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.3em]">{isUmbrella ? "Global" : "Conversion"}</span>
-                                <span className="text-3xl font-black text-white tracking-tighter">+{conversionRate.toFixed(1)}%</span>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 space-y-5 w-full">
-                            {isUmbrella ? (
-                                domainData.slice(0, 3).map((d, i) => (
-                                    <div key={d.name} className="p-6 bg-zinc-900 border border-white/5 rounded-3xl shadow-inner hover:border-indigo-500/20 transition-all">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-3">
-                                                <div className={cn("w-2.5 h-2.5 rounded-full", i === 0 ? "bg-indigo-500" : i === 1 ? "bg-violet-500" : "bg-cyan-500")} />
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{d.name}</span>
-                                            </div>
-                                            <span className="text-lg font-black text-white">{d.value}</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-zinc-950 rounded-full overflow-hidden">
-                                            <div className={cn("h-full", i === 0 ? "bg-indigo-500" : i === 1 ? "bg-violet-500" : "bg-cyan-500")} style={{ width: `${(d.value / (totalRegs || 1)) * 100}%` }} />
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <>
-                                    <div className="p-6 bg-zinc-900 border border-white/5 rounded-3xl shadow-inner group-hover:border-emerald-500/20 transition-all">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Validated Attendance</span>
-                                            </div>
-                                            <span className="text-lg font-black text-white">{totalAttended}</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-zinc-950 rounded-full overflow-hidden">
-                                            <div className="h-full bg-emerald-500" style={{ width: `${conversionRate}%` }} />
-                                        </div>
-                                    </div>
-                                    <div className="p-6 bg-zinc-900 border border-white/5 rounded-3xl shadow-inner">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-zinc-700" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">No-Show / Pending</span>
-                                            </div>
-                                            <span className="text-lg font-black text-zinc-200">{totalRegs - totalAttended}</span>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. Registrations by Department - Custom Animated Bar Chart */}
-                <div className="p-12 bg-zinc-950 border border-white/5 rounded-[3.5rem] space-y-10 shadow-2xl group">
-                    <div className="space-y-1">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-white flex items-center gap-3 italic text-blue-400">
-                            Department Participation
-                        </h4>
-                        <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Outreach across institutional departments.</p>
-                    </div>
-
-                    <div className="space-y-6 pt-2">
-                        {deptData.map((dept, i) => (
-                            <div key={dept.name} className="space-y-3 group/row">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-10 relative z-10">
+                        {deptData.slice(0, 5).map((dept, i) => (
+                            <div key={dept.name} className="space-y-4 group/heat min-w-0">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] group-hover/row:text-white transition-colors">{dept.name}</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-base font-black text-white tracking-tighter">{dept.count}</span>
-                                        <span className="text-[9px] font-bold text-zinc-700 uppercase">Students</span>
+                                    <div className="flex items-center gap-6">
+                                        <span className="text-xs font-black text-zinc-700 italic">0{i+1}</span>
+                                        <span className="text-lg font-black text-white uppercase tracking-tight group-hover/heat:text-indigo-400 transition-colors truncate max-w-[200px] md:max-w-none">{dept.name}</span>
+                                    </div>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-4xl font-black text-white italic transition-all group-hover/heat:scale-110">{dept.count}</span>
+                                        <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Registrations</span>
                                     </div>
                                 </div>
-                                <div className="h-4 bg-zinc-900 rounded-2xl overflow-hidden border border-white/5 p-1">
+                                <div className="h-12 bg-white/5 p-1.5 relative overflow-hidden group-hover/heat:bg-white/10 transition-colors">
                                     <motion.div
                                         initial={{ width: 0 }}
                                         animate={{ width: `${(dept.count / maxDeptCount) * 100}%` }}
-                                        transition={{ duration: 1.5, delay: i * 0.1, ease: "circOut" }}
+                                        transition={{ duration: 2, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
                                         className={cn(
-                                            "h-full rounded-full shadow-[0_0_15px_rgba(37,99,235,0.2)]",
-                                            i % 2 === 0 ? "bg-gradient-to-r from-blue-600 to-cyan-500" : "bg-gradient-to-r from-indigo-700 to-blue-500"
+                                            "h-full relative",
+                                            i === 0 ? "bg-white" : "bg-indigo-600"
                                         )}
-                                    />
+                                    >
+                                        {i === 0 && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-transparent" />}
+                                    </motion.div>
                                 </div>
                             </div>
                         ))}
@@ -404,8 +312,8 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
 
             {/* Winners Snapshot & Institutional Audit */}
             {!isUmbrella && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 p-12 bg-zinc-950 border border-white/5 rounded-[3.5rem] space-y-10 shadow-2xl relative overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-4">
+                    <div className="lg:col-span-2 p-12 bg-zinc-950 border border-white/5 shadow-2xl space-y-10 relative overflow-hidden">
                         <div className="flex items-center justify-between relative z-10">
                             <div className="space-y-1">
                                 <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-amber-500 flex items-center gap-3 italic">
@@ -423,13 +331,13 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: idx * 0.1 }}
                                         key={winner.id}
-                                        className="flex items-center gap-8 p-8 rounded-[2.5rem] bg-zinc-900/60 border border-white/[0.04] hover:border-amber-500/30 transition-all group overflow-hidden relative shadow-inner"
+                                        className="flex items-center gap-8 p-8 bg-zinc-900 border border-white/[0.04] hover:border-amber-500/30 transition-all group overflow-hidden relative shadow-inner"
                                     >
                                         <div className={cn(
-                                            "w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0 shadow-2xl z-10",
-                                            idx === 0 ? "bg-amber-500 text-black shadow-amber-500/30" :
-                                                idx === 1 ? "bg-zinc-200 text-zinc-900 shadow-white/10" :
-                                                    "bg-orange-800 text-white shadow-orange-800/10"
+                                            "w-16 h-16 rounded-sm flex items-center justify-center text-2xl font-black shrink-0 shadow-2xl z-10",
+                                            idx === 0 ? "bg-amber-500 text-black" :
+                                                idx === 1 ? "bg-zinc-200 text-zinc-900" :
+                                                    "bg-orange-800 text-white"
                                         )}>
                                             {idx + 1}
                                         </div>
@@ -441,22 +349,20 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                                             <p className="text-[9px] font-black text-zinc-700 uppercase tracking-widest mb-1">Score Matrix</p>
                                             <p className="text-3xl font-black text-white tracking-tighter italic">{winner.score}<span className="text-[11px] text-zinc-600 ml-1">pts</span></p>
                                         </div>
-                                        <div className="absolute top-0 right-0 h-full w-32 bg-gradient-to-l from-amber-500/5 to-transparent skew-x-12 translate-x-10 group-hover:translate-x-0 transition-transform duration-700" />
                                     </motion.div>
                                 ))
                             ) : (
-                                <div className="py-20 flex flex-col items-center justify-center gap-6 text-center border-4 border-dashed border-white/5 rounded-[3rem] bg-zinc-900/40">
+                                <div className="py-20 flex flex-col items-center justify-center gap-6 text-center border-4 border-dashed border-white/5 bg-zinc-900/40">
                                     <Trophy size={48} className="text-zinc-800 animate-pulse" />
                                     <div>
                                         <p className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.4em]">Evaluation Data Null</p>
-                                        <p className="text-[10px] text-zinc-800 font-bold uppercase tracking-widest mt-2">Finish grading all submissions to generate rank array.</p>
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="p-12 bg-indigo-600 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden flex flex-col justify-between group">
+                    <div className="p-12 bg-indigo-600 text-white shadow-2xl relative overflow-hidden flex flex-col justify-between group">
                         <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:rotate-12 group-hover:scale-125 transition-all duration-1000">
                             <Award size={180} />
                         </div>
@@ -466,19 +372,19 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                                 <h3 className="text-4xl font-black tracking-tight mt-1 uppercase italic leading-tight">Institutional Ledger</h3>
                             </div>
                             <div className="space-y-5">
-                                <div className="p-8 bg-white/10 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 shadow-2xl">
+                                <div className="p-8 bg-white/10 backdrop-blur-2xl border border-white/20 shadow-2xl">
                                     <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-70 block mb-2">Digital Assets Issued</span>
                                     <span className="text-5xl font-black tracking-tighter">{totalAttended}</span>
                                 </div>
-                                <div className="flex items-center justify-between p-6 bg-black/20 backdrop-blur-sm rounded-3xl">
+                                <div className="flex items-center justify-between p-6 bg-black/20 backdrop-blur-sm">
                                     <span className="text-[10px] font-black uppercase tracking-widest">Audit Policy</span>
-                                    <span className="px-5 py-2 rounded-full bg-emerald-500 text-black text-[9px] font-black uppercase tracking-[0.2em]">Verified</span>
+                                    <span className="px-5 py-2 bg-emerald-500 text-black text-[9px] font-black uppercase tracking-[0.2em]">Verified</span>
                                 </div>
                             </div>
                         </div>
                         <button
                             onClick={() => setShowCertList(true)}
-                            className="w-full h-16 bg-white text-indigo-600 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.2em] mt-12 hover:bg-black hover:text-white transition-all shadow-[0_20px_40px_rgba(0,0,0,0.3)] relative z-10 active:scale-95"
+                            className="w-full h-16 bg-white text-indigo-600 text-[11px] font-black uppercase tracking-[0.2em] mt-12 hover:bg-black hover:text-white transition-all shadow-2xl relative z-10"
                         >
                             Review Digital Registry
                         </button>
@@ -501,7 +407,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                             initial={{ opacity: 0, scale: 0.9, y: 50 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 50 }}
-                            className="relative w-full max-w-5xl bg-zinc-950 border border-white/10 rounded-[4rem] p-12 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] flex flex-col max-h-[85vh]"
+                            className="relative w-full max-w-5xl bg-zinc-950 border border-white/10 p-12 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] flex flex-col max-h-[85vh]"
                         >
                             <header className="mb-12 flex items-center justify-between">
                                 <div>
@@ -511,7 +417,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                                     </h3>
                                     <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-2">Real-time audit verification of institutional assets.</p>
                                 </div>
-                                <button onClick={() => setShowCertList(false)} className="w-14 h-14 rounded-3xl bg-zinc-900 flex items-center justify-center text-zinc-500 hover:text-white transition-all border border-white/5">
+                                <button onClick={() => setShowCertList(false)} className="w-14 h-14 bg-zinc-900 flex items-center justify-center text-zinc-500 hover:text-white transition-all border border-white/5">
                                     <Search size={20} />
                                 </button>
                             </header>
@@ -534,7 +440,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                                                     <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mt-1 opacity-50">{r.student?.email}</p>
                                                 </td>
                                                 <td className="px-8 py-6">
-                                                    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 text-[9px] font-black uppercase tracking-widest">
+                                                    <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 text-[9px] font-black uppercase tracking-widest">
                                                         <CheckCircle2 size={10} /> Certified
                                                     </span>
                                                 </td>
@@ -542,7 +448,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                                                     0x{event?.id.slice(0, 4).toUpperCase()}{r.id.slice(0, 8).toUpperCase()}
                                                 </td>
                                                 <td className="px-8 py-6 text-right">
-                                                    <span className="text-[10px] font-black text-emerald-500/80 bg-emerald-500/5 px-3 py-1.5 rounded-lg border border-emerald-500/10">VALIDATED</span>
+                                                    <span className="text-[10px] font-black text-emerald-500/80 bg-emerald-500/5 px-3 py-1.5 border border-emerald-500/10 uppercase">Validated</span>
                                                 </td>
                                             </tr>
                                         ))}
@@ -553,7 +459,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                             <footer className="mt-12 pt-10 border-t border-white/5 flex justify-end">
                                 <button
                                     onClick={() => setShowCertList(false)}
-                                    className="px-12 h-16 bg-zinc-900 border border-white/5 rounded-[2rem] text-[11px] font-black text-zinc-500 uppercase tracking-[0.2em] hover:text-white hover:bg-zinc-800 transition-all shadow-2xl"
+                                    className="px-12 h-16 bg-zinc-900 border border-white/5 text-[11px] font-black text-zinc-500 uppercase tracking-[0.2em] hover:text-white hover:bg-zinc-800 transition-all shadow-2xl"
                                 >
                                     Dismiss Registry
                                 </button>

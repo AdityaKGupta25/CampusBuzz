@@ -23,7 +23,8 @@ import {
     CheckCircle2,
     Loader2,
     Camera,
-    Trash2
+    Trash2,
+    Briefcase
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -41,6 +42,7 @@ export default function StudentProfilePage() {
     const [error, setError] = useState<string | null>(null);
     const [certCount, setCertCount] = useState(0);
     const [ticketCount, setTicketCount] = useState(0);
+    const [managementRecords, setManagementRecords] = useState<any[]>([]);
 
     // Settings state
     const [newPassword, setNewPassword] = useState("");
@@ -77,7 +79,12 @@ export default function StudentProfilePage() {
                 .select("id", { count: "exact", head: true })
                 .eq("user_id", profile.dbId)
                 .eq("status", "confirmed");
-            setTicketCount(tc ?? 0);
+            const { data: records } = await supabase
+                .from("event_staff")
+                .select("*, events(title, start_time)")
+                .eq("student_id", profile.dbId)
+                .order("assigned_at", { ascending: false });
+            setManagementRecords(records || []);
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : "Failed to load stats.");
         } finally {
@@ -360,6 +367,58 @@ export default function StudentProfilePage() {
                                         <InfoRow icon={Clock} label="Enrolment Date" value={new Date(profile.created_at).toLocaleDateString()} />
                                         <InfoRow icon={Shield} label="Account Integrity" value="Fully Verified" accent="text-emerald-500" />
                                     </div>
+                                </motion.section>
+
+                                {/* Leadership & Management Record */}
+                                <motion.section 
+                                    initial={{ opacity: 0, y: 20 }} 
+                                    animate={{ opacity: 1, y: 0 }} 
+                                    transition={{ delay: 0.05 }}
+                                    className="bg-zinc-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 p-8 shadow-xl"
+                                >
+                                    <div className="flex items-center justify-between mb-8">
+                                        <div className="flex items-center gap-3 opacity-80">
+                                            <Briefcase size={16} className="text-cyan-500" />
+                                            <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Leadership & Management Record</h3>
+                                        </div>
+                                        <div className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[8px] font-black text-cyan-500 uppercase tracking-widest animate-pulse">
+                                            Live Ledger
+                                        </div>
+                                    </div>
+
+                                    {managementRecords.length > 0 ? (
+                                        <div className="flex flex-wrap gap-3">
+                                            {managementRecords.map((record) => {
+                                                const eventYear = record.events?.start_time ? new Date(record.events.start_time).getFullYear() : "";
+                                                return (
+                                                    <div 
+                                                        key={record.id}
+                                                        className="px-4 py-2.5 rounded-2xl bg-zinc-950 border border-white/5 flex items-center gap-3 border hover:border-cyan-500/30 transition-all group shadow-inner"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                                                            <Briefcase size={14} />
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <p className="text-[10px] font-black text-white uppercase tracking-tight">
+                                                                {record.role_name || record.role || "Organizer"}
+                                                                <span className="text-zinc-500 mx-1.5">—</span>
+                                                                <span className="text-zinc-400 italic">{record.events?.title} {eventYear}</span>
+                                                            </p>
+                                                            <div className="flex items-center gap-1 mt-0.5">
+                                                                <CheckCircle2 size={10} className="text-emerald-500" />
+                                                                <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Maestro Verified</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="py-10 text-center rounded-3xl border border-dashed border-white/5 bg-white/[0.01]">
+                                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest italic leading-relaxed">No management credentials indexed yet.</p>
+                                            <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mt-1">Host your first event to build your management resume.</p>
+                                        </div>
+                                    )}
                                 </motion.section>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

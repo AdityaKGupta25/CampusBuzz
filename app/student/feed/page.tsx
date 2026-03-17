@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -35,6 +35,8 @@ import {
 import { cn } from "@/lib/utils";
 import { fetchPublicEvents, type DbEvent, supabase } from "@/lib/supabase";
 import { useUser } from "@/context/UserContext";
+import { motion, AnimatePresence } from "framer-motion";
+import { EventManageDashboardInner } from "@/app/faculty/event/[id]/manage/page";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -171,7 +173,7 @@ function getCategoryPillClass(cat: Category) {
     if (cat === "sports") return "border-sky-500/40 text-sky-300 bg-sky-500/10";
     if (cat === "workshop") return "border-emerald-500/40 text-emerald-300 bg-emerald-500/10";
     if (cat === "competition") return "border-rose-500/40 text-rose-300 bg-rose-500/10";
-    return "border-white/20 text-white/50 bg-white/5";
+    return "border-white/10 text-white/50 bg-white/5";
 }
 function seatsClass(left: number, total: number) {
     const pct = left / total;
@@ -216,9 +218,9 @@ function NotifDrawer({ open, onClose, notifications, loading, onDelete, onClearA
         <>
             {open && <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm" onClick={onClose} />}
             <div className={cn(
-                "fixed top-0 right-0 bottom-0 z-[160] w-full max-w-sm flex flex-col transition-transform duration-300",
+                "fixed top-0 right-0 bottom-0 z-[160] w-full max-w-sm flex flex-col transition-transform duration-300 border-l border-white/10",
                 open ? "translate-x-0" : "translate-x-full"
-            )} style={{ background: "#0e0e1f", borderLeft: "1px solid rgba(255,255,255,0.07)" }}>
+            )} style={{ background: "var(--background)" }}>
                 {/* Drawer header */}
                 <div className="flex items-center justify-between px-6 pt-14 pb-5 border-b border-white/5">
                     <div>
@@ -227,14 +229,14 @@ function NotifDrawer({ open, onClose, notifications, loading, onDelete, onClearA
                     </div>
                     <div className="flex items-center gap-2">
                         {notifications.length > 0 && (
-                            <button 
+                            <button
                                 onClick={onClearAll}
-                                className="h-9 px-3 rounded-xl bg-white/5 border border-white/8 flex items-center gap-2 text-[10px] font-black text-zinc-500 hover:text-rose-400 hover:bg-rose-500/5 hover:border-rose-500/20 transition-all uppercase tracking-widest"
+                                className="h-9 px-3 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-center gap-2 text-[10px] font-black text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/5 hover:border-rose-500/20 transition-all uppercase tracking-widest"
                             >
                                 <Trash2 size={12} /> Clear All
                             </button>
                         )}
-                        <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
+                        <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
                             <X size={16} />
                         </button>
                     </div>
@@ -284,8 +286,8 @@ function NotifDrawer({ open, onClose, notifications, loading, onDelete, onClearA
                                     {!n.is_read && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0 mt-2 shadow-[0_0_10px_rgba(129,140,248,0.5)]" />}
                                 </div>
                             </div>
-                            
-                            <button 
+
+                            <button
                                 onClick={(e) => { e.stopPropagation(); onDelete(n.id); }}
                                 className="opacity-0 group-hover:opacity-100 w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all shrink-0 mt-1"
                             >
@@ -594,9 +596,9 @@ function CardSkel() {
 function RegisterSheet({ event, onClose, onConfirm }: { event: CampusEvent; onClose: () => void; onConfirm: (id: string) => void }) {
     const CatIcon = getCategoryIcon(event.category);
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)" }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="w-full max-w-md rounded-t-xl border-t border-zinc-800 shadow-2xl overflow-hidden" style={{ background: "#09090b" }}>
+            <div className="w-full max-w-md rounded-t-xl border-t border-zinc-800 shadow-2xl overflow-hidden bg-zinc-950">
                 <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-zinc-800" /></div>
 
                 <div className="mx-4 mt-3 mb-4 rounded-2xl overflow-hidden relative" style={{ aspectRatio: "16/9" }}>
@@ -652,6 +654,7 @@ export default function StudentFeedPage() {
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [activeFeaturedIndex, setActiveFeaturedIndex] = useState(0);
     const [activeMissions, setActiveMissions] = useState<any[]>([]);
+    const [selectedBlueprintId, setSelectedBlueprintId] = useState<string | null>(null);
 
     // Header data
     const [karmaPoints, setKarmaPoints] = useState<number | null>(null);
@@ -711,7 +714,7 @@ export default function StudentFeedPage() {
                         .eq("grant_edit_access", true);
 
                     if (missions) {
-                        // Filter for non-live, non-completed drafts
+                        // Filter for non-live, non-completed drafts including blueprint review state
                         const active = missions.filter((m: any) =>
                             ['draft', 'pending', 'revision_required', 'changes_requested'].includes(m.event.status)
                         );
@@ -859,7 +862,7 @@ export default function StudentFeedPage() {
     }
 
     return (
-        <div className="font-sans min-h-screen" style={{ color: "white", background: "#09090f" }}>
+        <div className="font-sans min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors duration-300">
             {/* ── Notification Drawer ── */}
             <NotifDrawer
                 open={notifOpen}
@@ -874,15 +877,14 @@ export default function StudentFeedPage() {
             <div className="w-full max-w-md lg:max-w-7xl mx-auto relative px-4">
 
                 {/* ══ ULTRA-COMPACT HEADER ════════════════════════════════════════ */}
-                <header className="sticky top-0 z-30 pt-6 pb-4 space-y-4"
-                    style={{ background: "rgba(9,9,15,0.92)", backdropFilter: "blur(32px)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <header className="sticky top-0 z-30 pt-6 pb-4 space-y-4 bg-white/90 dark:bg-zinc-950/92 backdrop-blur-3xl border-b border-zinc-200 dark:border-white/5 transition-colors">
 
                     {/* Row 1: Title + Karma + Bell */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="flex items-baseline gap-2.5">
-                                <h1 className="text-white font-black text-2xl tracking-tight">Feed</h1>
-                                <span className="text-[11px] font-black text-zinc-500 uppercase tracking-[0.2em] leading-none translate-y-[-1px]">{greeting} 🌙</span>
+                                <h1 className="text-zinc-900 dark:text-white font-black text-2xl tracking-tight">Feed</h1>
+                                <span className="text-[11px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] leading-none translate-y-[-1px]">{greeting} {greeting.includes('Morning') ? '☀️' : greeting.includes('Afternoon') ? '🌞' : '🌙'}</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -893,17 +895,21 @@ export default function StudentFeedPage() {
                                 </span>
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shine_1.5s_ease-in-out_infinite]" />
                             </div>
-                            <button onClick={handleBellClick} className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-all">
+                            <button onClick={handleBellClick} className="relative w-9 h-9 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-all">
                                 <Bell size={16} />
-                                {notifCount > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full" />}
+                                {notifCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center animate-bounce">
+                                        {notifCount}
+                                    </span>
+                                )}
                             </button>
                         </div>
                     </div>
 
-                    {/* Row 2: Search + Segmented Toggle */}
-                    <div className="flex gap-2">
+                    {/* Row 2: Search + Segmented Control */}
+                    <div className="flex items-center gap-3">
                         <div className="relative flex-1 group">
-                            <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-zinc-500 group-focus-within:text-white transition-colors">
+                            <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-zinc-400 dark:text-zinc-500 group-focus-within:text-indigo-600 dark:group-focus-within:text-white transition-colors">
                                 <Search size={14} />
                             </div>
                             <input
@@ -911,26 +917,25 @@ export default function StudentFeedPage() {
                                 placeholder="Search..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 text-xs font-semibold placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/10 focus:border-zinc-700 transition-all"
+                                className="w-full h-10 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-10 pr-4 text-xs font-semibold placeholder:text-zinc-400 dark:placeholder:text-zinc-600 text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/20 dark:focus:ring-white/10 dark:focus:border-zinc-700 transition-all"
                             />
                         </div>
-
                         {/* iOS Style Segmented Control */}
-                        <div className="flex p-0.5 bg-zinc-950 rounded-xl border border-zinc-800 h-10 w-[140px] shrink-0">
+                        <div className="flex p-0.5 bg-zinc-100 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 h-10 w-[140px] shrink-0">
                             <button
                                 onClick={() => setFeedFilter("campus")}
                                 className={cn(
                                     "flex-1 rounded-[10px] text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5",
-                                    feedFilter === "campus" ? "bg-zinc-100 text-black shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                                    feedFilter === "campus" ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm dark:shadow-none" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
                                 )}
                             >
-                                <div className={cn("w-1 h-1 rounded-full", feedFilter === "campus" ? "bg-black" : "bg-emerald-500")} /> Campus
+                                <div className={cn("w-1 h-1 rounded-full", feedFilter === "campus" ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700")} /> Campus
                             </button>
                             <button
                                 onClick={() => setFeedFilter("marketplace")}
                                 className={cn(
                                     "flex-1 rounded-[10px] text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5",
-                                    feedFilter === "marketplace" ? "bg-indigo-500 text-white shadow-lg" : "text-zinc-500 hover:text-zinc-400"
+                                    feedFilter === "marketplace" ? "bg-indigo-600 dark:bg-indigo-500 text-white shadow-lg" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-400"
                                 )}
                             >
                                 <Globe size={10} /> Global
@@ -947,8 +952,8 @@ export default function StudentFeedPage() {
                                 <button key={tab} onClick={() => setActiveTab(tab)}
                                     className={cn("flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full border text-[9px] font-black uppercase tracking-[0.15em] transition-all",
                                         isActive
-                                            ? "bg-white border-white text-black shadow-lg"
-                                            : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-white"
+                                            ? "bg-zinc-950 dark:bg-white border-zinc-950 dark:border-white text-white dark:text-black shadow-lg"
+                                            : "bg-zinc-100 dark:bg-white/5 border-zinc-200 dark:border-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                                     )}>
                                     {tab === 'live' && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
                                     {tab === 'past' ? 'Archives' : tab}
@@ -956,7 +961,7 @@ export default function StudentFeedPage() {
                             );
                         })}
 
-                        <div className="w-px h-5 bg-white/10 self-center mx-1 shrink-0" />
+                        <div className="w-px h-5 bg-zinc-200 dark:bg-white/10 self-center mx-1 shrink-0" />
 
                         {/* Category Pills */}
                         {CATS.map((cat) => {
@@ -965,8 +970,8 @@ export default function StudentFeedPage() {
                                 <button key={cat} onClick={() => setActiveCat(cat)}
                                     className={cn("flex-shrink-0 px-4 py-2 rounded-full border text-[9px] font-black uppercase tracking-[0.15em] transition-all",
                                         isActive
-                                            ? "bg-indigo-500 border-indigo-500 text-white shadow-md shadow-indigo-500/20"
-                                            : "bg-white/5 border-white/5 text-zinc-500 hover:text-white"
+                                            ? "bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 text-white shadow-md shadow-indigo-500/20"
+                                            : "bg-zinc-100 dark:bg-white/5 border-zinc-200 dark:border-white/5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                                     )}>
                                     {cat}
                                 </button>
@@ -985,40 +990,84 @@ export default function StudentFeedPage() {
                         </div>
                     )}
 
-                    {/* ── Active Blueprint Missions (Action Required) ── */}
+                    {/* ── Active Organizer Missions (HIGH PRIORITY — shown first) ── */}
                     {activeMissions.length > 0 && (
-                        <section className="mt-8">
-                            <div className="flex items-center gap-2 mb-4">
-                                <Shield size={12} className="text-indigo-400" />
-                                <h2 className="text-white font-black text-xs uppercase tracking-widest underline decoration-indigo-500/20 underline-offset-8 decoration-2">Active Blueprint Missions</h2>
-                                <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse ml-2" />
+                        <section className="mt-6 space-y-3">
+                            {/* Section label */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                    <span className="flex h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                                    <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.3em]">Action Required</p>
+                                </div>
+                                <div className="flex-1 h-px bg-rose-500/10" />
+                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">{activeMissions.length} Mission{activeMissions.length > 1 ? 's' : ''}</p>
                             </div>
-                            <div className="space-y-3">
-                                {activeMissions.map((mission) => (
-                                    <div
-                                        key={mission.id}
-                                        onClick={() => router.push(`/faculty/event/${mission.event.id}/manage`)}
-                                        className="w-full bg-gradient-to-r from-indigo-500/10 to-indigo-500/5 border border-indigo-500/20 rounded-[2.5rem] p-8 cursor-pointer hover:border-indigo-500/40 hover:bg-indigo-500/[0.07] transition-all group flex items-center justify-between gap-6 relative overflow-hidden ring-1 ring-white/5"
-                                    >
-                                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl -translate-y-16 translate-x-16" />
-                                        <div className="flex items-center gap-5">
-                                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                                                <Sparkles size={20} className="text-indigo-300" />
-                                            </div>
-                                            <div>
-                                                <div className="mb-0.5">
-                                                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest capitalize">{mission.event.status.replace('_', ' ')}</span>
+
+                            {activeMissions.map((mission) => (
+                                <div
+                                    key={mission.id}
+                                    onClick={() => router.push(`/faculty/event/${mission.event.id}/manage`)}
+                                    className="relative w-full rounded-[2rem] overflow-hidden cursor-pointer group mission-pulse-card transition-all"
+                                    style={{
+                                        background: "var(--mission-card-bg, linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(99,102,241,0.1) 100%))",
+                                        border: "1px solid var(--mission-card-border, rgba(99,102,241,0.2))",
+                                        boxShadow: "0 8px 32px rgba(99,102,241,0.05)"
+                                    }}
+                                >
+                                    {/* Animated top shimmer */}
+                                    <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(129,140,248,0.4) 50%, transparent 100%)" }} />
+
+                                    {/* Ambient glow blob */}
+                                    <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full blur-3xl opacity-20 dark:opacity-40" style={{ background: "rgba(99,102,241,0.15)" }} />
+                                    <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full blur-3xl opacity-10 dark:opacity-20" style={{ background: "rgba(139,92,246,0.08)" }} />
+
+                                    <div className="relative z-10 p-5 sm:p-6">
+                                        {/* Top row: Mission type badge + status */}
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/30 border border-indigo-500/20 dark:border-indigo-500/40 flex items-center justify-center">
+                                                    <Sparkles size={12} className="text-indigo-600 dark:text-indigo-300" />
                                                 </div>
-                                                <h3 className="text-white font-bold text-base tracking-tight leading-tight group-hover:text-indigo-300 transition-colors uppercase italic">{mission.event.title}</h3>
-                                                <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Designate Role: {mission.role_name || mission.role || 'Organizer'}</p>
+                                                <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-300 uppercase tracking-[0.3em]">🚀 Mission Assigned</span>
                                             </div>
+                                            <span className="text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest bg-indigo-500/5 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-200 border border-indigo-500/10 dark:border-indigo-500/20">
+                                                {(mission.event.status === 'draft' ? 'Filling Blueprint' : mission.event.status || 'draft').replace(/_/g, ' ')}
+                                            </span>
                                         </div>
-                                        <div className="h-10 px-4 rounded-xl bg-indigo-500 text-white flex items-center gap-2 text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 whitespace-nowrap">
-                                            Edit Blueprint <ArrowRight size={14} />
+
+                                        {/* Role badge */}
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl mb-3 bg-zinc-900/5 dark:bg-white/4 border border-zinc-900/10 dark:border-white/8">
+                                            <Users size={10} className="text-indigo-600 dark:text-indigo-400" />
+                                            <span className="text-[10px] font-black text-zinc-900 dark:text-white uppercase tracking-widest">
+                                                {mission.role_name || mission.role || 'Overall Host'}
+                                            </span>
+                                            <div className="w-1 h-1 rounded-full bg-indigo-500" />
+                                            <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Full Editing Rights</span>
                                         </div>
+
+                                        {/* Event name */}
+                                        <h3 className="text-zinc-950 dark:text-white font-black text-xl tracking-tight italic leading-tight mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-200 transition-colors">
+                                            {mission.event.title}
+                                        </h3>
+                                        <p className="text-zinc-400 dark:text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-5">
+                                            Tap to open Event Builder Dashboard
+                                        </p>
+
+                                        {/* CTA */}
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedBlueprintId(mission.event.id);
+                                            }}
+                                            className="w-full h-12 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-2.5 transition-all group-hover:gap-3"
+                                            style={{ background: "white", color: "black", boxShadow: "0 4px 20px rgba(99,102,241,0.3)" }}>
+                                            <Sparkles size={13} />
+                                            🚀 Edit Blueprint
+                                            <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+                                        </button>
                                     </div>
-                                ))}
-                            </div>
+                                </div>
+                            ))}
                         </section>
                     )}
 
@@ -1131,7 +1180,44 @@ export default function StudentFeedPage() {
                 .pulse-badge {
                     animation: pulse-indigo 3s infinite ease-in-out;
                 }
+
+                @keyframes mission-glow {
+                    0%, 100% { box-shadow: 0 0 0 1px rgba(99,102,241,0.08), 0 8px 32px rgba(99,102,241,0.12), inset 0 1px 0 rgba(255,255,255,0.05); border-color: rgba(99,102,241,0.3); }
+                    50%       { box-shadow: 0 0 0 1px rgba(99,102,241,0.15), 0 8px 40px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.07); border-color: rgba(99,102,241,0.55); }
+                }
+                .mission-pulse-card {
+                    animation: mission-glow 3s ease-in-out infinite;
+                }
             `}</style>
+            {/* ── Immersive Blueprint Editor Modal ── */}
+            <AnimatePresence>
+                {selectedBlueprintId && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 100 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 100 }}
+                        className="fixed inset-0 z-[200] bg-zinc-950 flex flex-col overflow-hidden"
+                    >
+                        <Suspense fallback={
+                            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+                                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Igniting Editor Matrix</p>
+                            </div>
+                        }>
+                            <div className="flex-1 overflow-y-auto">
+                                <EventManageDashboardInner 
+                                    propEventId={selectedBlueprintId} 
+                                    onClose={() => {
+                                        setSelectedBlueprintId(null);
+                                        // Refresh missions list if needed
+                                        if (user?.institution_id) void loadAll(user.institution_id);
+                                    }} 
+                                />
+                            </div>
+                        </Suspense>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

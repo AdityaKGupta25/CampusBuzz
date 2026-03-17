@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use, useRef } from "react";
 import {
     MapPin, Clock, Calendar, Users, IndianRupee, ArrowLeft,
-    Share2, CheckCircle2, Loader2, Trophy, Star, ShieldCheck,
+    Share2, CheckCircle2, Loader2, Trophy, Star, ShieldCheck, Shield,
     Timer, Users2, Medal, Award, ChevronRight, Check, Globe, User,
     Ticket, ScrollText, History, Sparkles, Layers, ArrowRight,
     MessageSquare, Handshake, Briefcase, Shirt, Gift, ChevronDown, ShoppingBag,
@@ -170,6 +170,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
     // Institutional Observer: faculty/HOD viewing someone else's event
     const [isObserver, setIsObserver] = useState(false);
     const [isOrganizer, setIsOrganizer] = useState(false);
+    const [canEdit, setCanEdit] = useState(false);
 
     interface UserJourney {
         participated: boolean;
@@ -231,16 +232,16 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
             if (eventRes.error || !eventRes.data) { setNotFound(true); return; }
             const data = eventRes.data;
 
-            let mergedSponsors = [...(data.sponsors || [])];
+            let mergedSponsors = (data.sponsors || []).map((s: any) => ({ ...s, is_global: false }));
             if (data.parent_event_id) {
                 const { data: parentSponsorsData } = await supabase
                     .from("events")
                     .select("sponsors")
                     .eq("id", data.parent_event_id)
-                    .eq("institution_id", institutionId)
-                    .single();
+                    .single(); // Removed .eq("institution_id", institutionId) to allow inheritance from public parents
                 if (parentSponsorsData?.sponsors) {
-                    mergedSponsors = [...parentSponsorsData.sponsors, ...mergedSponsors];
+                    const globalSponsors = (parentSponsorsData.sponsors as any[]).map((s: any) => ({ ...s, is_global: true }));
+                    mergedSponsors = [...globalSponsors, ...mergedSponsors];
                 }
             }
 
@@ -279,13 +280,14 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                     // Check if member of event staff
                     const { data: staffData } = await supabase
                         .from("event_staff")
-                        .select("id")
+                        .select("id, grant_edit_access")
                         .eq("event_id", id)
                         .eq("student_id", profile.id)
                         .maybeSingle();
 
                     if (staffData) {
                         setIsOrganizer(true);
+                        setCanEdit(!!staffData.grant_edit_access);
                     }
                     const { data: existing } = await supabase
                         .from("registrations").select("id, status, team:teams(id, name, leader_id), team_id")
@@ -416,16 +418,16 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
     // ── Guards ─────────────────────────────────────────────────────────────────
     if (loading) {
         return (
-            <div className="min-h-screen w-full bg-[#09090b] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+            <div className="min-h-screen w-full bg-zinc-950 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-indigo-600 dark:text-indigo-500 animate-spin" />
             </div>
         );
     }
     if (notFound || !event) {
         return (
-            <div className="min-h-screen w-full bg-[#09090b] flex items-center justify-center text-white">
+            <div className="min-h-screen w-full bg-zinc-950 flex items-center justify-center">
                 <div className="text-center space-y-4">
-                    <p className="text-2xl font-black">Event not found</p>
+                    <p className="text-2xl font-black text-white">Event not found</p>
                     <button onClick={() => router.back()} className="text-indigo-400 text-sm hover:underline">← Go Back</button>
                 </div>
             </div>
@@ -458,11 +460,11 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
     return (
         /* Fix 1: Full-bleed, no max-w, bg-[#09090b] covers everything */
-        <div className="min-h-screen w-full bg-[#09090b] text-zinc-100 font-sans relative">
+         <div className="min-h-screen w-full bg-zinc-950 text-zinc-100 font-sans relative transition-colors duration-300">
 
             {/* Preview Banner */}
             {previewMode && (
-                <div className="fixed top-0 inset-x-0 z-[200] bg-amber-500 text-black px-6 py-2 flex items-center justify-between shadow-xl">
+                <div className="fixed top-0 inset-x-0 z-[200] bg-amber-500 text-zinc-100 px-6 py-2 flex items-center justify-between shadow-xl">
                     <div className="flex items-center gap-2 font-black text-[11px] uppercase tracking-widest">
                         <span>👁️</span> PREVIEW MODE — This is how students will see your event.
                     </div>
@@ -485,10 +487,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                         className="w-full h-full object-cover"
                         alt={event.title}
                     />
-                    {/* Dark overlays */}
-                    <div className="absolute inset-0 bg-black/60" />
-                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[#09090b] via-[#09090b]/70 to-transparent" />
-                    <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[#09090b]/60 to-transparent" />
+                    {/* Theme-aware Hero Overlay */}
+                    <div className="absolute inset-0 bg-black/60 transition-colors" />
+                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-zinc-950 via-zinc-950/70 to-transparent transition-all" />
+                    <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-zinc-950/60 to-transparent transition-all" />
                     {!isComp && <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 via-transparent to-rose-500/10 opacity-60" />}
                 </div>
 
@@ -506,7 +508,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                 {/* Preview Mode Sticky Header */}
                 {previewMode && (
-                    <div className="fixed top-0 left-0 right-0 z-[1000] bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+                    <div className="fixed top-0 left-0 right-0 z-[1000] bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800 px-6 py-4 flex items-center justify-between transition-colors">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
                                 <Eye size={18} />
@@ -517,7 +519,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                         </div>
                         <button
                             onClick={onClosePreview}
-                            className="h-10 px-6 rounded-xl bg-white text-black text-[9px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-xl active:scale-95 flex items-center gap-2"
+                            className="h-10 px-6 rounded-xl bg-zinc-950 text-zinc-100 text-[9px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-xl active:scale-95 flex items-center gap-2"
                         >
                             Close & Return to Matrix <X size={14} />
                         </button>
@@ -547,17 +549,17 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                     ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                                     : event.status === "completed"
                                         ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
-                                        : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                                        : "bg-zinc-900 border border-zinc-800 text-zinc-400"
                             )}>
                                 {event.status === "completed" ? "Successfully Concluded" : (isComp ? "Active Competition" : "Official Event")}
                             </span>
-                            <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-zinc-800 bg-zinc-900 text-zinc-400 backdrop-blur-md">
+                            <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-zinc-900 border-zinc-800 text-zinc-400 backdrop-blur-md">
                                 <Users size={10} className="inline mr-1.5" />{registered > 0 ? `${registered} attendees` : "Registration Open"}
                             </span>
                         </div>
 
                         {/* Title */}
-                        <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.85] text-white drop-shadow-2xl">
+                        <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.85] text-white transition-colors">
                             {event.title}
                         </h1>
 
@@ -576,7 +578,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                 <span className="text-sm font-black text-amber-100 uppercase tracking-widest">🏆 Earn 500 Karma Points</span>
                             </div>
 
-                            <div className="flex items-center gap-2.5 bg-zinc-900 backdrop-blur-xl border border-zinc-800 rounded-xl px-5 py-3 ml-auto hidden md:flex">
+                            <div className="flex items-center gap-2.5 bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-xl px-5 py-3 ml-auto hidden md:flex transition-all shadow-sm">
                                 <Calendar size={16} className="text-zinc-500" />
                                 <span className="text-sm font-bold text-zinc-200">{fmtDateLong(event.start_time)}</span>
                             </div>
@@ -591,7 +593,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
             {/* ══════════════════════════════════════════════════════════════
                 Sticky Nav bar
             ══════════════════════════════════════════════════════════════ */}
-            <nav className={cn("sticky z-[100] w-full bg-zinc-950 border-b border-zinc-800", previewMode ? "top-8" : "top-0")}>
+             <nav className={cn("sticky z-[100] w-full bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800 transition-colors", previewMode ? "top-8" : "top-0")}>
                 <div className="w-full px-6 md:px-16 flex items-center justify-between h-14">
                     <div className="flex items-center gap-1">
                         {NAV_ITEMS.map(item => (
@@ -614,7 +616,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                         ))}
                     </div>
                     <div className="hidden md:flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
-                        <span className="text-zinc-600">{registered} / {capacity} seats</span>
+                        <span className="text-zinc-400">{registered} / {capacity} seats</span>
                         <div className="w-24 h-1.5 bg-zinc-900 rounded-full overflow-hidden">
                             <div className="h-full bg-gradient-to-r from-indigo-500 to-rose-500 rounded-full" style={{ width: `${fillPct}%` }} />
                         </div>
@@ -689,7 +691,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                             <h4 className="text-2xl md:text-3xl font-black text-white tracking-tighter uppercase italic">{category}</h4>
                                                         </div>
                                                         <div className="flex items-center gap-3">
-                                                            <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">{events.length} Tracks Available</span>
+                                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{events.length} Tracks Available</span>
                                                         </div>
                                                     </div>
 
@@ -708,7 +710,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                                             <img
                                                                                 src={sub.banner_url}
                                                                                 alt={sub.title}
-                                                                                className="absolute inset-0 w-full h-full object-cover scale-100 group-hover:scale-110 transition-transform duration-700 opacity-40 group-hover:opacity-60"
+                                                                                className="absolute inset-0 w-full h-full object-cover scale-100 group-hover:scale-110 transition-transform duration-700 opacity-40 group-hover:opacity-60 grayscale dark:grayscale-0"
                                                                             />
                                                                             {/* Content Overlay */}
                                                                             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent z-[2]" />
@@ -720,15 +722,15 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                                                     <div className="space-y-6 relative z-10">
                                                                         <div className="flex items-center justify-between">
-                                                                            <span className="px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest">
+                                                                            <span className="px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
                                                                                 {fmtDateLong(sub.start_time)}
                                                                             </span>
-                                                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-300 bg-zinc-900 border border-zinc-800 backdrop-blur-md px-2.5 py-1.5 rounded-full">
+                                                                            <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-300 bg-zinc-900 border border-zinc-800 backdrop-blur-md px-2.5 py-1.5 rounded-full shadow-sm">
                                                                                 <Users size={12} className="text-indigo-400" />
                                                                                 <span className="font-black">{sub.registered_count}</span>
                                                                             </div>
                                                                         </div>
-                                                                        <h5 className="text-3xl font-black text-white tracking-tighter leading-[0.9] uppercase group-hover:text-indigo-400 transition-colors drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">{sub.title}</h5>
+                                                                        <h5 className="text-3xl font-black text-white tracking-tighter leading-[0.85] uppercase group-hover:text-indigo-400 transition-colors drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">{sub.title}</h5>
                                                                     </div>
 
                                                                     <div className="pt-6 relative z-10">
@@ -749,10 +751,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         </div>
                                     ) : (
                                         <div className="py-24 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-950/50 flex flex-col items-center gap-4">
-                                            <div className="w-16 h-16 rounded-[2rem] bg-zinc-900 flex items-center justify-center text-zinc-700">
+                                            <div className="w-16 h-16 rounded-[2rem] bg-zinc-900 flex items-center justify-center text-zinc-400">
                                                 <Layers size={24} />
                                             </div>
-                                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">No tracks mapped to this domain yet</p>
+                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">No tracks mapped to this domain yet</p>
                                         </div>
                                     );
                                 })()}
@@ -817,17 +819,22 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             return tiers.filter(t => grouped[t]).map(tier => (
                                                 <div key={tier} className="space-y-8">
                                                     <div className="flex items-center gap-6">
-                                                        <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] whitespace-nowrap">{tier}</span>
+                                                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.4em] whitespace-nowrap">{tier}</span>
                                                         <div className="h-px flex-1 bg-zinc-800" />
                                                     </div>
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
                                                         {grouped[tier].map((spo: any, i: number) => (
-                                                            <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-8 aspect-square flex flex-col items-center justify-center gap-4 hover:border-zinc-700 transition-all grayscale opacity-60 hover:grayscale-0 hover:opacity-100">
+                                                            <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-8 aspect-square flex flex-col items-center justify-center gap-4 hover:border-zinc-700 transition-all grayscale opacity-60 hover:grayscale-0 hover:opacity-100 relative group/spo">
+                                                                {spo.is_global && (
+                                                                    <div className="absolute top-3 right-3 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 z-10">
+                                                                        <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Global Partner</p>
+                                                                    </div>
+                                                                )}
                                                                 {spo.logo_url ? (
                                                                     <img src={spo.logo_url} className="w-full h-full object-contain" alt={spo.name} />
                                                                 ) : (
                                                                     <div className="w-full h-full bg-zinc-800 rounded-xl flex items-center justify-center">
-                                                                        <Globe size={24} className="text-zinc-700" />
+                                                                        <Globe size={24} className="text-zinc-400" />
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -880,10 +887,10 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Total Registrations</p>
+                                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Registrations</p>
                                             <div className="flex items-end justify-between">
                                                 <span className="text-4xl font-black text-white">{registered}</span>
-                                                <span className="text-zinc-600 font-bold mb-1 text-sm"></span>
+                                                <span className="text-zinc-400 font-bold mb-1 text-sm"></span>
                                             </div>
                                             <div className="h-2 bg-zinc-950 rounded-full overflow-hidden">
                                                 <div className="h-full bg-indigo-500" style={{ width: `${Math.min((registered / (event.venue?.capacity ?? 500)) * 100, 100)}%` }} />
@@ -895,14 +902,14 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         <div className="flex items-center gap-4 py-4 border-b border-zinc-800">
                                             <Calendar size={20} className="text-indigo-400" />
                                             <div>
-                                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Fest Dates</p>
+                                                <p className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">Fest Dates</p>
                                                 <p className="text-sm font-black text-white uppercase italic">{fmtDateLong(event.start_time)}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4 py-4 border-b border-zinc-800">
                                             <MapPin size={20} className="text-rose-400" />
                                             <div>
-                                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Venue</p>
+                                                <p className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">Venue</p>
                                                 <p className="text-sm font-bold text-white">{event.venue?.name ?? "Campus Wide"}</p>
                                             </div>
                                         </div>
@@ -910,13 +917,13 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
 
                                     <button
                                         onClick={() => scrollTo("matrix")}
-                                        className="w-full h-16 rounded-xl bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-zinc-100 transition-all shadow-xl active:scale-95"
+                                        className="w-full h-16 rounded-xl bg-zinc-950 text-zinc-100 text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-zinc-100 transition-all shadow-xl active:scale-95"
                                     >
                                         Explore Competitions <ArrowRight size={16} />
                                     </button>
 
                                     <div className="text-center">
-                                        <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest leading-relaxed">
+                                        <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest leading-relaxed">
                                             Registration is handled per individual event track. Scroll down to browse the lineup.
                                         </p>
                                     </div>
@@ -929,7 +936,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             <Globe size={18} className="text-zinc-500" />
                                         </div>
                                         <div>
-                                            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Host Institution</p>
+                                            <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Host Institution</p>
                                             <p className="text-xs font-black text-white uppercase">{event.department?.name || "Global Faculty"}</p>
                                         </div>
                                     </div>
@@ -956,13 +963,13 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         <div className="flex items-center gap-6 border-b border-zinc-800 pb-2">
                                             <button
                                                 onClick={() => setActiveCompletedTab("journey")}
-                                                className={cn("text-lg font-black uppercase tracking-widest pb-4 -mb-[9px] transition-all", activeCompletedTab === "journey" ? "text-indigo-400 border-b-2 border-indigo-400" : "text-zinc-600 hover:text-zinc-400")}
+                                                className={cn("text-lg font-black uppercase tracking-widest pb-4 -mb-[9px] transition-all", activeCompletedTab === "journey" ? "text-indigo-400 border-b-2 border-indigo-400" : "text-zinc-400 hover:text-zinc-400")}
                                             >
                                                 My Journey
                                             </button>
                                             <button
                                                 onClick={() => setActiveCompletedTab("recap")}
-                                                className={cn("text-lg font-black uppercase tracking-widest pb-4 -mb-[9px] transition-all", activeCompletedTab === "recap" ? "text-indigo-400 border-b-2 border-indigo-400" : "text-zinc-600 hover:text-zinc-400")}
+                                                className={cn("text-lg font-black uppercase tracking-widest pb-4 -mb-[9px] transition-all", activeCompletedTab === "recap" ? "text-indigo-400 border-b-2 border-indigo-400" : "text-zinc-400 hover:text-zinc-400")}
                                             >
                                                 Recap
                                             </button>
@@ -1012,7 +1019,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             <section ref={sectionRefs.about} id="about" className="space-y-8">
                                 <SectionHeader icon={<Star size={16} />} eyebrow="The Experience" title="Overview" color="text-indigo-400" />
                                 <div
-                                    className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 md:p-12 text-base text-zinc-400 font-medium leading-[1.85] prose prose-invert mx-auto max-w-none break-words"
+                                    className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 md:p-12 text-base text-zinc-400 font-medium leading-[1.85] prose dark:prose-invert mx-auto max-w-none break-words shadow-sm dark:shadow-none transition-all"
                                     dangerouslySetInnerHTML={{ __html: event.rich_description || event.description || "Description coming soon." }}
                                 />
 
@@ -1021,23 +1028,23 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                     <div className="pt-8 space-y-6">
                                         <div className="flex items-center gap-3">
                                             <div className="h-1 w-8 bg-indigo-500 rounded-full" />
-                                            <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] italic">Available Participation Tracks</p>
+                                            <p className="text-[10px] font-black text-zinc-100 dark:text-white uppercase tracking-[0.3em] italic">Available Participation Tracks</p>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             {event.participation_tracks.map((track) => (
-                                                <div key={track.id} className="p-6 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between group/trk hover:border-indigo-500/30 transition-all">
+                                                <div key={track.id} className="p-6 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between group/trk hover:border-indigo-500/30 transition-all shadow-sm dark:shadow-none">
                                                     <div className="space-y-1">
-                                                        <h4 className="text-sm font-black text-white uppercase tracking-tight group-hover/trk:text-indigo-400 transition-colors">{track.name}</h4>
+                                                        <h4 className="text-sm font-black text-white uppercase tracking-tight group-hover/trk:text-indigo-600 dark:group-hover/trk:text-indigo-400 transition-colors">{track.name}</h4>
                                                         <div className="flex items-center gap-2">
                                                             <span className={cn(
                                                                 "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
-                                                                track.is_team ? "bg-cyan-500/10 text-cyan-400" : "bg-zinc-800 text-zinc-500"
+                                                                track.is_team ? "bg-cyan-500/10 text-cyan-400" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500"
                                                             )}>
                                                                 {track.is_team ? "Team Required" : "Solo Entry"}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-500 group-hover/trk:text-indigo-400 transition-all">
+                                                    <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 group-hover/trk:text-indigo-600 dark:group-hover/trk:text-indigo-400 transition-all">
                                                         {track.is_team ? <Users2 size={14} /> : <User size={14} />}
                                                     </div>
                                                 </div>
@@ -1048,399 +1055,413 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             </section>
 
                             {/* Activities section (Umbrella events) */}
-                            {
-                                subEvents.length > 0 && (
-                                    <section ref={sectionRefs.activities} id="activities" className="space-y-8 px-4">
-                                        <SectionHeader icon={<Layers size={16} />} eyebrow="Fest Lineup" title="Activities & Domains" color="text-cyan-400" />
+                            {subEvents.length > 0 && (
+                                <section ref={sectionRefs.activities} id="activities" className="space-y-8 px-4">
+                                    <SectionHeader icon={<Layers size={16} />} eyebrow="Fest Lineup" title="Activities & Domains" color="text-cyan-400" />
 
-                                        {festDomains.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 pt-2">
-                                                {festDomains.map(d => (
-                                                    <span key={d.id} className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400" title={d.description}>
-                                                        {d.name}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {subEvents.map((sub, i) => (
-                                                <motion.div
-                                                    key={sub.id}
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    whileInView={{ opacity: 1, y: 0 }}
-                                                    transition={{ delay: i * 0.05 }}
-                                                    className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl group hover:border-indigo-500/30 transition-all cursor-pointer relative overflow-hidden"
-                                                    onClick={() => window.location.href = `/student/event/${sub.id}`}
-                                                >
-                                                    <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                                                        <ArrowRight size={20} className="text-indigo-400" />
-                                                    </div>
-                                                    <div className="space-y-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-black italic">
-                                                                {i + 1}
-                                                            </span>
-                                                            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-                                                                {festDomains.find(d => d.id === sub.fest_domain_id)?.name || "Competition"}
-                                                            </span>
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-lg font-black text-white tracking-tight uppercase group-hover:text-indigo-400 transition-colors uppercase">{sub.title}</h3>
-                                                            <p className="text-[10px] font-bold text-zinc-600 mt-1 uppercase tracking-widest">
-                                                                {fmtDateLong(sub.start_time)} • Competition Track
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
+                                    {festDomains.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 pt-2">
+                                            {festDomains.map(d => (
+                                                <span key={d.id} className="px-5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400" title={d.description}>
+                                                    {d.name}
+                                                </span>
                                             ))}
                                         </div>
-                                    </section>
-                                )
-                            }
+                                    )}
 
-                            {/* Schedule / Rounds */}
-                            {
-                                isComp && (
-                                    <section ref={sectionRefs.schedule} id="schedule" className="space-y-8">
-                                        <SectionHeader icon={<Clock size={16} />} eyebrow="Event Timeline" title="Schedule" color="text-rose-400" />
-                                        {rounds.length > 0 ? (
-                                            <div className="relative space-y-4">
-                                                {/* Timeline line */}
-                                                <div className="absolute left-[27px] top-8 bottom-8 w-px bg-gradient-to-b from-indigo-500/40 via-white/5 to-transparent" />
-                                                {rounds.map((round, idx) => {
-                                                    const meta = TYPE_META[round.type] ?? TYPE_META.submission;
-                                                    const now = new Date().getTime();
-                                                    const start = new Date(round.start_time).getTime();
-                                                    const end = new Date(round.end_time).getTime();
-
-                                                    let statusBadge = { label: "Upcoming", color: "bg-zinc-800 text-zinc-500 border-zinc-800" };
-                                                    let isLive = false;
-                                                    let isClosed = false;
-
-                                                    if (now > end) {
-                                                        statusBadge = { label: "Closed", color: "bg-rose-500/10 text-rose-500 border-rose-500/20" };
-                                                        isClosed = true;
-                                                    } else if (now >= start && now <= end) {
-                                                        statusBadge = { label: "LIVE", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
-                                                        isLive = true;
-                                                    }
-
-                                                    const roundSubmission = submissions.find(s => s.round_id === round.id);
-                                                    // Check explicit requires_submission flag (set by faculty), fallback to type check
-                                                    const submissionEnabled = round.requires_submission === true
-                                                        || (round.requires_submission === undefined && (round.type === 'submission' || round.type === 'digital_submission'));
-                                                    const canSubmit = submissionEnabled && isLive && (regStatus === "registered" || regStatus === "confirmed");
-
-                                                    return (
-                                                        <motion.div
-                                                            key={round.id}
-                                                            initial={{ opacity: 0, x: -12 }}
-                                                            whileInView={{ opacity: 1, x: 0 }}
-                                                            viewport={{ once: true }}
-                                                            transition={{ delay: idx * 0.07 }}
-                                                            className="flex gap-5 group"
-                                                        >
-                                                            {/* Number bubble with glowing line */}
-                                                            <div className="relative flex flex-col items-center">
-                                                                <div className={cn(
-                                                                    "shrink-0 w-14 h-14 rounded-xl border flex items-center justify-center font-black text-xl z-20 transition-all duration-500",
-                                                                    isLive ? "bg-emerald-500 text-black border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]" :
-                                                                        isClosed ? "bg-zinc-900 text-zinc-600 border-zinc-800" :
-                                                                            "bg-zinc-900 text-zinc-500 border-zinc-800"
-                                                                )}>
-                                                                    {idx + 1}
-                                                                </div>
-                                                                {idx !== rounds.length - 1 && (
-                                                                    <div className={cn(
-                                                                        "w-0.5 h-full -mt-2 mb-4 transition-all duration-1000",
-                                                                        isLive ? "bg-gradient-to-b from-emerald-500 via-emerald-500/20 to-zinc-800" : "bg-zinc-800"
-                                                                    )} />
-                                                                )}
-                                                            </div>
-
-                                                            {/* Card */}
-                                                            <div className={cn(
-                                                                "flex-1 p-6 md:p-8 bg-zinc-900 border rounded-xl transition-all duration-500 group-hover:bg-zinc-800/50",
-                                                                isLive ? "border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.05)]" : "border-zinc-800"
-                                                            )}>
-                                                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                                                                    <div className="space-y-4">
-                                                                        <div className="flex items-center gap-3">
-                                                                            <span className={cn(
-                                                                                "px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest leading-none",
-                                                                                isLive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : statusBadge.color
-                                                                            )}>
-                                                                                {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5" />}
-                                                                                {statusBadge.label}
-                                                                            </span>
-                                                                            <span className={cn("px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900 text-[9px] font-black uppercase tracking-widest text-zinc-400 leading-none")}>
-                                                                                {meta.label}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        <div className="space-y-2">
-                                                                            <h3 className="text-xl font-black text-white tracking-tight uppercase italic">{round.title}</h3>
-                                                                            {round.description && (
-                                                                                <p className="text-sm text-zinc-500 font-medium leading-relaxed max-w-xl">{round.description}</p>
-                                                                            )}
-                                                                        </div>
-
-                                                                        <div className="flex items-center gap-6 pt-2">
-                                                                            <div className="flex flex-col">
-                                                                                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Window Start</p>
-                                                                                <p className="text-xs font-bold text-zinc-300">{fmtDateLong(round.start_time)} • {fmtTime(round.start_time)}</p>
-                                                                            </div>
-                                                                            <div className="flex flex-col">
-                                                                                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Window End</p>
-                                                                                <p className="text-xs font-bold text-zinc-300">{fmtDateLong(round.end_time)} • {fmtTime(round.end_time)}</p>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="flex flex-col items-start md:items-end justify-between">
-                                                                        {canSubmit ? (
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setSelectedRound(round);
-                                                                                    setIsSubModalOpen(true);
-                                                                                }}
-                                                                                className={cn(
-                                                                                    "px-8 py-5 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2",
-                                                                                    roundSubmission
-                                                                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-black"
-                                                                                        : "bg-white text-black hover:bg-emerald-500 hover:text-white shadow-[0_10px_30px_rgba(255,255,255,0.1)]"
-                                                                                )}
-                                                                            >
-                                                                                {roundSubmission ? (
-                                                                                    <><Check size={14} /> View Submission</>
-                                                                                ) : (
-                                                                                    <><SendIcon size={14} /> Submit Solution</>
-                                                                                )}
-                                                                            </button>
-                                                                        ) : roundSubmission ? (
-                                                                            <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-500/60 transition-all">
-                                                                                <CheckCircle2 size={14} />
-                                                                                <span className="text-[10px] font-black uppercase tracking-widest">Entry Received</span>
-                                                                            </div>
-                                                                        ) : isClosed ? (
-                                                                            <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-zinc-950/50 border border-zinc-800 text-zinc-600">
-                                                                                <LockIcon size={14} />
-                                                                                <span className="text-[10px] font-black uppercase tracking-widest">Registration Closed</span>
-                                                                            </div>
-                                                                        ) : null}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </motion.div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <div className="h-40 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl flex items-center justify-center">
-                                                <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">Schedule not yet announced</p>
-                                            </div>
-                                        )}
-                                    </section>
-                                )
-                            }
-
-                            {/* Prizes */}
-                            {
-                                isComp && competitionPrizes.length > 0 && (
-                                    <section ref={sectionRefs.prizes} id="prizes" className="space-y-8">
-                                        <SectionHeader icon={<Trophy size={16} />} eyebrow="Rewards" title="Prizes" color="text-amber-400" />
-                                        <DetailRow icon={<ShieldCheck size={12} />} label="Governance" value="Verified" color="text-emerald-400" />
-
-                                        {/* Rulebook Link */}
-                                        {event.rulebook_url && (
-                                            <a
-                                                href={event.rulebook_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex w-full items-center justify-between p-5 bg-gradient-to-r from-orange-500/10 to-transparent border border-zinc-800 rounded-xl group hover:border-orange-500/40 transition-all"
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {subEvents.map((sub, i) => (
+                                            <motion.div
+                                                key={sub.id}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                whileInView={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: i * 0.05 }}
+                                                className="bg-zinc-900 border border-zinc-800 p-8 rounded-xl group hover:border-indigo-500/30 transition-all cursor-pointer relative overflow-hidden shadow-sm dark:shadow-none"
+                                                onClick={() => window.location.href = `/student/event/${sub.id}`}
                                             >
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-black transition-all">
-                                                        <ScrollText size={18} />
+                                                <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                                                    <ArrowRight size={20} className="text-indigo-400" />
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-black italic">
+                                                            {i + 1}
+                                                        </span>
+                                                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+                                                            {festDomains.find(d => d.id === sub.fest_domain_id)?.name || "Competition"}
+                                                        </span>
                                                     </div>
                                                     <div>
-                                                        <p className="text-[11px] font-black text-white uppercase tracking-widest">Official Rulebook</p>
-                                                        <p className="text-[9px] font-medium text-orange-500/60 mt-0.5 uppercase tracking-tighter">View legal constraints & rules</p>
+                                                        <h3 className="text-lg font-black text-zinc-100 dark:text-white tracking-tight uppercase group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors uppercase">{sub.title}</h3>
+                                                        <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">
+                                                            {fmtDateLong(sub.start_time)} • Competition Track
+                                                        </p>
                                                     </div>
                                                 </div>
-                                                <ArrowRight size={14} className="text-orange-500/50 group-hover:translate-x-1 group-hover:text-orange-400 transition-all" />
-                                            </a>
-                                        )}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                            {competitionPrizes.map((prize, idx) => {
-                                                const rankStyle = [
-                                                    { bg: "bg-amber-500/10", border: "border-amber-500/25", text: "text-amber-400", watermark: "text-amber-500/5" },
-                                                    { bg: "bg-zinc-400/10", border: "border-zinc-400/20", text: "text-zinc-300", watermark: "text-zinc-400/5" },
-                                                    { bg: "bg-orange-700/10", border: "border-orange-700/20", text: "text-orange-600", watermark: "text-orange-700/5" },
-                                                ][idx] ?? { bg: "bg-zinc-900", border: "border-zinc-800", text: "text-zinc-500", watermark: "text-white/5" };
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* Schedule / Rounds */}
+                            {isComp && (
+                                <section ref={sectionRefs.schedule} id="schedule" className="space-y-8">
+                                    <SectionHeader icon={<Clock size={16} />} eyebrow="Event Timeline" title="Schedule" color="text-rose-400" />
+                                    {rounds.length > 0 ? (
+                                        <div className="relative space-y-4">
+                                            {/* Timeline line */}
+                                            <div className="absolute left-[27px] top-8 bottom-8 w-px bg-gradient-to-b from-indigo-500/40 via-zinc-200 dark:via-white/5 to-transparent" />
+                                            {rounds.map((round, idx) => {
+                                                const meta = TYPE_META[round.type] ?? TYPE_META.submission;
+                                                const now = new Date().getTime();
+                                                const start = new Date(round.start_time).getTime();
+                                                const end = new Date(round.end_time).getTime();
+
+                                                let statusBadge = { label: "Upcoming", color: "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 border-zinc-800" };
+                                                let isLive = false;
+                                                let isClosed = false;
+
+                                                if (now > end) {
+                                                    statusBadge = { label: "Closed", color: "bg-rose-500/10 text-rose-600 dark:text-rose-500 border-rose-500/20" };
+                                                    isClosed = true;
+                                                } else if (now >= start && now <= end) {
+                                                    statusBadge = { label: "LIVE", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
+                                                    isLive = true;
+                                                }
+
+                                                const roundSubmission = submissions.find(s => s.round_id === round.id);
+                                                const submissionEnabled = round.requires_submission === true
+                                                    || (round.requires_submission === undefined && (round.type === 'submission' || round.type === 'digital_submission'));
+                                                const canSubmit = submissionEnabled && isLive && (regStatus === "registered" || regStatus === "confirmed");
+
                                                 return (
                                                     <motion.div
-                                                        key={prize.id}
-                                                        initial={{ opacity: 0, y: 16 }}
+                                                        key={round.id}
+                                                        initial={{ opacity: 0, x: -12 }}
                                                         whileInView={{ opacity: 1, y: 0 }}
                                                         viewport={{ once: true }}
                                                         transition={{ delay: idx * 0.07 }}
-                                                        className={cn("relative p-8 border rounded-xl overflow-hidden group", rankStyle.bg, rankStyle.border)}
+                                                        className="flex gap-5 group"
                                                     >
-                                                        <div className="flex gap-5 relative z-10">
-                                                            <div className={cn("w-12 h-12 rounded-xl border flex items-center justify-center shrink-0", rankStyle.bg, rankStyle.border, rankStyle.text)}>
-                                                                {prize.icon === "trophy" && <Trophy size={20} />}
-                                                                {prize.icon === "medal" && <Medal size={20} />}
-                                                                {prize.icon === "certificate" && <ScrollText size={20} />}
-                                                                {prize.icon === "award" && <Trophy size={20} />}
+                                                        {/* Number bubble with glowing line */}
+                                                        <div className="relative flex flex-col items-center">
+                                                            <div className={cn(
+                                                                "shrink-0 w-14 h-14 rounded-xl border flex items-center justify-center font-black text-xl z-20 transition-all duration-500",
+                                                                isLive ? "bg-emerald-500 text-white dark:text-zinc-100 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]" :
+                                                                    isClosed ? "bg-zinc-950 dark:bg-zinc-900 text-zinc-300 dark:text-zinc-400 border-zinc-800" :
+                                                                        "bg-zinc-950 dark:bg-zinc-900 text-zinc-500 border-zinc-800"
+                                                            )}>
+                                                                {idx + 1}
                                                             </div>
-                                                            <div className="space-y-1.5">
-                                                                <div className={cn("text-[9px] font-black uppercase tracking-widest", rankStyle.text)}>
-                                                                    {prize.rank || (idx === 0 ? "1st Place" : idx === 1 ? "2nd Place" : idx === 2 ? "3rd Place" : `${idx + 1}th Place`)}
-                                                                </div>
-                                                                <h4 className="text-base font-black text-white tracking-tight">{prize.title}</h4>
-                                                                <p className="text-sm font-bold text-zinc-300">
-                                                                    {prize.reward || (prize.value ? `₹${Number(prize.value).toLocaleString("en-IN")}` : "—")}
-                                                                </p>
-                                                            </div>
+                                                            {idx !== rounds.length - 1 && (
+                                                                <div className={cn(
+                                                                    "w-0.5 h-full -mt-2 mb-4 transition-all duration-1000",
+                                                                    isLive ? "bg-gradient-to-b from-emerald-500 via-emerald-500/20 to-zinc-200 dark:to-zinc-800" : "bg-zinc-200 dark:bg-zinc-800"
+                                                                )} />
+                                                            )}
                                                         </div>
-                                                        <div className={cn("absolute -bottom-4 -right-2 text-[80px] font-black italic select-none pointer-events-none", rankStyle.watermark)}>
-                                                            {idx + 1}
+
+                                                        {/* Card */}
+                                                        <div className={cn(
+                                                            "flex-1 p-6 md:p-8 bg-zinc-950 dark:bg-zinc-900 border rounded-xl transition-all duration-500 group-hover:bg-zinc-900/50 dark:group-hover:bg-zinc-800/50",
+                                                            isLive ? "border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.05)]" : "border-zinc-800"
+                                                        )}>
+                                                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                                                                <div className="space-y-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className={cn(
+                                                                            "px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest leading-none",
+                                                                            isLive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : statusBadge.color
+                                                                        )}>
+                                                                            {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5" />}
+                                                                            {statusBadge.label}
+                                                                        </span>
+                                                                        <span className={cn("px-3 py-1 rounded-full border border-zinc-800 bg-zinc-950 dark:bg-zinc-900 text-[9px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 leading-none")}>
+                                                                            {meta.label}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <div className="space-y-2">
+                                                                        <h3 className="text-xl font-black text-white tracking-tight uppercase italic">{round.title}</h3>
+                                                                        {round.description && (
+                                                                            <p className="text-sm text-zinc-400 dark:text-zinc-500 font-medium leading-relaxed max-w-xl">{round.description}</p>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-6 pt-2">
+                                                                        <div className="flex flex-col">
+                                                                            <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">Window Start</p>
+                                                                            <p className="text-xs font-bold text-zinc-400">{fmtDateLong(round.start_time)} • {fmtTime(round.start_time)}</p>
+                                                                        </div>
+                                                                        <div className="flex flex-col">
+                                                                            <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">Window End</p>
+                                                                            <p className="text-xs font-bold text-zinc-400">{fmtDateLong(round.end_time)} • {fmtTime(round.end_time)}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex flex-col items-start md:items-end justify-between">
+                                                                    {canSubmit ? (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setSelectedRound(round);
+                                                                                setIsSubModalOpen(true);
+                                                                            }}
+                                                                            className={cn(
+                                                                                "px-8 py-5 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-2",
+                                                                                roundSubmission
+                                                                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white dark:hover:text-zinc-100"
+                                                                                    : "bg-zinc-950 dark:bg-zinc-950 text-white dark:text-zinc-100 hover:bg-emerald-600 dark:hover:bg-emerald-500 hover:text-white dark:hover:text-white shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(255,255,255,0.1)] transition-all"
+                                                                            )}
+                                                                        >
+                                                                            {roundSubmission ? (
+                                                                                <><Check size={14} /> View Submission</>
+                                                                            ) : (
+                                                                                <><SendIcon size={14} /> Submit Solution</>
+                                                                            )}
+                                                                        </button>
+                                                                    ) : roundSubmission ? (
+                                                                        <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-600 dark:text-emerald-500/60 transition-all">
+                                                                            <CheckCircle2 size={14} />
+                                                                            <span className="text-[10px] font-black uppercase tracking-widest">Entry Received</span>
+                                                                        </div>
+                                                                    ) : isClosed ? (
+                                                                        <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-zinc-900/50 dark:bg-zinc-950/50 border border-zinc-800 text-zinc-500 dark:text-zinc-400">
+                                                                            <LockIcon size={14} />
+                                                                            <span className="text-[10px] font-black uppercase tracking-widest">Registration Closed</span>
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </motion.div>
                                                 );
                                             })}
                                         </div>
-                                    </section>
-                                )
-                            }
+                                    ) : (
+                                        <div className="h-40 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl flex items-center justify-center">
+                                            <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">Schedule not yet announced</p>
+                                        </div>
+                                    )}
+                                </section>
+                            )}
 
-                            {/* Giveaways & Perks */}
-                            {
-                                eventPerks.length > 0 && (
-                                    <section ref={sectionRefs.perks} id="perks" className="space-y-8">
-                                        <SectionHeader icon={<Sparkles size={16} />} eyebrow="Attendee Benefits" title="Giveaways & Perks" color="text-indigo-400" />
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                            {eventPerks.map((perk, idx) => (
+                            {/* Prizes */}
+                            {isComp && competitionPrizes.length > 0 && (
+                                <section ref={sectionRefs.prizes} id="prizes" className="space-y-8">
+                                    <SectionHeader icon={<Trophy size={16} />} eyebrow="Rewards" title="Prizes" color="text-amber-400" />
+                                    <DetailRow icon={<ShieldCheck size={12} />} label="Governance" value="Verified" color="text-emerald-400" />
+
+                                    {/* Rulebook Link */}
+                                    {event.rulebook_url && (
+                                        <a
+                                            href={event.rulebook_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex w-full items-center justify-between p-5 bg-gradient-to-r from-orange-500/10 to-transparent border border-zinc-800 rounded-xl group hover:border-orange-500/40 transition-all shadow-sm dark:shadow-none"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-zinc-100 transition-all">
+                                                    <ScrollText size={18} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-white uppercase tracking-widest">Official Rulebook</p>
+                                                    <p className="text-[9px] font-medium text-orange-600 dark:text-orange-500/60 mt-0.5 uppercase tracking-tighter">View legal constraints & rules</p>
+                                                </div>
+                                            </div>
+                                            <ArrowRight size={14} className="text-orange-500/50 group-hover:translate-x-1 group-hover:text-orange-400 transition-all" />
+                                        </a>
+                                    )}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        {competitionPrizes.map((prize, idx) => {
+                                            const rankStyle = [
+                                                { bg: "bg-amber-500/10", border: "border-amber-500/25", text: "text-amber-400", watermark: "text-amber-500/5" },
+                                                { bg: "bg-zinc-400/10", border: "border-zinc-400/20", text: "text-zinc-300", watermark: "text-zinc-400/5" },
+                                                { bg: "bg-orange-700/10", border: "border-orange-700/20", text: "text-orange-600", watermark: "text-orange-700/5" },
+                                            ][idx] ?? { bg: "bg-zinc-900", border: "border-zinc-800", text: "text-zinc-500", watermark: "text-white/5" };
+                                            return (
                                                 <motion.div
-                                                    key={perk.id}
+                                                    key={prize.id}
                                                     initial={{ opacity: 0, y: 16 }}
                                                     whileInView={{ opacity: 1, y: 0 }}
                                                     viewport={{ once: true }}
                                                     transition={{ delay: idx * 0.07 }}
-                                                    className="relative p-8 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden group hover:border-indigo-500/30 transition-all"
+                                                    className={cn("relative p-8 border rounded-xl overflow-hidden group shadow-sm dark:shadow-none", rankStyle.bg, rankStyle.border)}
                                                 >
                                                     <div className="flex gap-5 relative z-10">
-                                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
-                                                            {perk.icon === "swag" || perk.icon === "goodie" ? <ShoppingBag size={20} /> : <Gift size={20} />}
+                                                        <div className={cn("w-12 h-12 rounded-xl border flex items-center justify-center shrink-0", rankStyle.bg, rankStyle.border, rankStyle.text)}>
+                                                            {prize.icon === "trophy" && <Trophy size={20} />}
+                                                            {prize.icon === "medal" && <Medal size={20} />}
+                                                            {prize.icon === "certificate" && <ScrollText size={20} />}
+                                                            {prize.icon === "award" && <Trophy size={20} />}
                                                         </div>
                                                         <div className="space-y-1.5">
-                                                            <div className="text-[9px] font-black uppercase tracking-widest text-indigo-500/60">
-                                                                {perk.category || "Event Perk"}
+                                                            <div className={cn("text-[9px] font-black uppercase tracking-widest", rankStyle.text)}>
+                                                                {prize.rank || (idx === 0 ? "1st Place" : idx === 1 ? "2nd Place" : idx === 2 ? "3rd Place" : `${idx + 1}th Place`)}
                                                             </div>
-                                                            <h4 className="text-base font-black text-white tracking-tight">{perk.title}</h4>
-                                                            {perk.reward && (
-                                                                <p className="text-sm font-bold text-zinc-300">{perk.reward}</p>
-                                                            )}
+                                                            <h4 className="text-base font-black text-white tracking-tight">{prize.title}</h4>
+                                                            <p className="text-sm font-bold text-zinc-400">
+                                                                {prize.reward || (prize.value ? `₹${Number(prize.value).toLocaleString("en-IN")}` : "—")}
+                                                            </p>
                                                         </div>
                                                     </div>
-                                                    <Gift size={100} className="absolute -bottom-8 -right-8 text-white/[0.02] -rotate-12" />
+                                                    <div className={cn("absolute -bottom-4 -right-2 text-[80px] font-black italic select-none pointer-events-none", rankStyle.watermark)}>
+                                                        {idx + 1}
+                                                    </div>
                                                 </motion.div>
-                                            ))}
-                                        </div>
-                                    </section>
-                                )
-                            }
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* Giveaways & Perks */}
+                            {eventPerks.length > 0 && (
+                                <section ref={sectionRefs.perks} id="perks" className="space-y-8">
+                                    <SectionHeader icon={<Sparkles size={16} />} eyebrow="Attendee Benefits" title="Giveaways & Perks" color="text-indigo-400" />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        {eventPerks.map((perk, idx) => (
+                                            <motion.div
+                                                key={perk.id}
+                                                initial={{ opacity: 0, y: 16 }}
+                                                whileInView={{ opacity: 1, y: 0 }}
+                                                viewport={{ once: true }}
+                                                transition={{ delay: idx * 0.07 }}
+                                                className="relative p-8 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden group hover:border-indigo-500/30 transition-all shadow-sm dark:shadow-none"
+                                            >
+                                                <div className="flex gap-5 relative z-10">
+                                                    <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                                                        {perk.icon === "swag" || perk.icon === "goodie" ? <ShoppingBag size={20} /> : <Gift size={20} />}
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <div className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-500/40">
+                                                            {perk.category || "Event Perk"}
+                                                        </div>
+                                                        <h4 className="text-base font-black text-white tracking-tight">{perk.title}</h4>
+                                                        {perk.reward && (
+                                                            <p className="text-sm font-bold text-zinc-400">{perk.reward}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <Gift size={100} className="absolute -bottom-8 -right-8 text-zinc-950/[0.02] dark:text-white/[0.02] -rotate-12" />
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* FAQs */}
-                            {
-                                event.faqs?.length > 0 && (
-                                    <section ref={sectionRefs.faqs} id="faqs" className="space-y-8">
-                                        <SectionHeader icon={<MessageSquare size={16} />} eyebrow="Have Questions?" title="FAQs" color="text-emerald-400" />
-                                        <div className="space-y-4">
-                                            {event.faqs.map((faq: any, i: number) => (
-                                                <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                                                    <details className="group">
-                                                        <summary className="flex items-center justify-between p-8 cursor-pointer list-none">
-                                                            <h4 className="text-base font-black text-white tracking-tight">{faq.question}</h4>
-                                                            <ChevronRight size={20} className="text-zinc-500 group-open:rotate-90 transition-transform" />
-                                                        </summary>
-                                                        <div className="px-8 pb-8 text-sm text-zinc-400 font-medium leading-relaxed border-t border-zinc-800 pt-6">
-                                                            {faq.answer}
-                                                        </div>
-                                                    </details>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </section>
-                                )
-                            }
+                            {event.faqs?.length > 0 && (
+                                <section ref={sectionRefs.faqs} id="faqs" className="space-y-8">
+                                    <SectionHeader icon={<MessageSquare size={16} />} eyebrow="Have Questions?" title="FAQs" color="text-emerald-400" />
+                                    <div className="space-y-4">
+                                        {event.faqs.map((faq: any, i: number) => (
+                                            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm dark:shadow-none">
+                                                <details className="group">
+                                                    <summary className="flex items-center justify-between p-8 cursor-pointer list-none transition-all hover:bg-zinc-900 dark:hover:bg-zinc-800/50">
+                                                        <h4 className="text-base font-black text-zinc-100 dark:text-white tracking-tight">{faq.question}</h4>
+                                                        <ChevronRight size={20} className="text-zinc-500 group-open:rotate-90 transition-transform" />
+                                                    </summary>
+                                                    <div className="px-8 pb-8 text-sm text-zinc-400 font-medium leading-relaxed border-t border-zinc-800 pt-6">
+                                                        {faq.answer}
+                                                    </div>
+                                                </details>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* Sponsors */}
-                            {
-                                event.sponsors?.length > 0 && (
-                                    <section ref={sectionRefs.sponsors} id="sponsors" className="space-y-8">
-                                        <SectionHeader icon={<Handshake size={20} />} eyebrow="Our Partners" title="Sponsors" color="text-indigo-400" />
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                                            {event.sponsors.map((spo: any, i: number) => (
-                                                <div key={i} className="group relative bg-zinc-950 border border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center gap-4 hover:border-indigo-500/30 transition-all aspect-square">
-                                                    {spo.logo_url ? (
-                                                        <img src={spo.logo_url} className="w-20 h-20 object-contain grayscale group-hover:grayscale-0 transition-all" alt={spo.name} />
-                                                    ) : (
-                                                        <GlobeIcon className="w-12 h-12 text-zinc-800" />
-                                                    )}
-                                                    <div className="text-center">
-                                                        <p className="text-[10px] font-black text-white uppercase tracking-tighter mb-0.5">{spo.name}</p>
-                                                        <span className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-500/60">{spo.tier || "Partner"}</span>
+                            {event.sponsors?.length > 0 && (
+                                <section ref={sectionRefs.sponsors} id="sponsors" className="space-y-8">
+                                    <SectionHeader icon={<Handshake size={20} />} eyebrow="Our Partners" title="Sponsors" color="text-indigo-400" />
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                                        {event.sponsors.map((spo: any, i: number) => (
+                                            <div key={i} className="group relative bg-zinc-950 border border-zinc-800 rounded-xl p-8 flex flex-col items-center justify-center gap-4 hover:border-indigo-500/30 transition-all aspect-square shadow-sm dark:shadow-none">
+                                                {spo.is_global && (
+                                                    <div className="absolute top-3 right-3 px-2 py-1 rounded-md bg-indigo-500/10 dark:bg-indigo-500/10 border border-indigo-500/20">
+                                                        <p className="text-[7px] font-black text-indigo-400 uppercase tracking-widest">Global Partner</p>
                                                     </div>
+                                                )}
+                                                {spo.logo_url ? (
+                                                    <img src={spo.logo_url} className="w-20 h-20 object-contain grayscale group-hover:grayscale-0 transition-all" alt={spo.name} />
+                                                ) : (
+                                                    <GlobeIcon className="w-12 h-12 text-zinc-200 dark:text-zinc-800" />
+                                                )}
+                                                <div className="text-center">
+                                                    <p className="text-[10px] font-black text-white uppercase tracking-tighter mb-0.5">{spo.name}</p>
+                                                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-500/60">{spo.tier || "Partner"}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </section>
-                                )
-                            }
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* Team */}
                             <section ref={sectionRefs.team} id="team" className="space-y-8">
                                 <SectionHeader icon={<Users2 size={16} />} eyebrow="Organizers" title="Team" color="text-cyan-400" />
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     {event.club && (
-                                        <div className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
+                                        <div className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-indigo-500/30 transition-all shadow-sm dark:shadow-none group">
                                             <div className="w-16 h-16 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center overflow-hidden shrink-0">
                                                 {event.club.logo_url
                                                     ? <img src={event.club.logo_url} className="w-full h-full object-cover" alt={event.club.name} />
                                                     : <Globe size={28} className="text-indigo-400" />}
                                             </div>
                                             <div>
-                                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Organizing Club</p>
-                                                <h3 className="text-base font-black text-white">{event.club.name}</h3>
+                                                <p className="text-[9px] font-black text-zinc-500 dark:text-zinc-500 uppercase tracking-widest mb-1">Organizing Club</p>
+                                                <h3 className="text-base font-black text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{event.club.name}</h3>
                                             </div>
                                         </div>
                                     )}
 
                                     {/* Institution Badge */}
                                     {event.institution && (
-                                        <div className="p-7 bg-zinc-900 border border-emerald-500/20 rounded-xl flex items-center gap-5 hover:border-emerald-500/40 transition-all relative overflow-hidden group">
+                                        <div className="p-7 bg-zinc-950 dark:bg-emerald-900/10 border border-emerald-500/20 rounded-xl flex items-center gap-5 hover:border-emerald-500/40 transition-all relative overflow-hidden group shadow-sm dark:shadow-none">
                                             <div className="absolute top-0 right-0 p-2 bg-emerald-500/10 rounded-bl-xl border-l border-b border-emerald-500/20">
-                                                <ShieldCheck size={12} className="text-emerald-500" />
+                                                <ShieldCheck size={12} className="text-emerald-600 dark:text-emerald-500" />
                                             </div>
-                                            <div className="w-16 h-16 rounded-xl bg-white flex items-center justify-center p-2 shrink-0 shadow-lg">
-                                                {event.institution.logo_url 
+                                            <div className="w-16 h-16 rounded-xl bg-zinc-950 dark:bg-zinc-800 border border-zinc-800 dark:border-zinc-700 flex items-center justify-center p-2 shrink-0 shadow-lg dark:shadow-none">
+                                                {event.institution.logo_url
                                                     ? <img src={event.institution.logo_url} className="w-full h-full object-contain" alt="" />
-                                                    : <Building2 size={28} className="text-zinc-900" />}
+                                                    : <Building2 size={28} className="text-zinc-200 dark:text-zinc-400" />}
                                             </div>
                                             <div>
-                                                <p className="text-[9px] font-black text-emerald-500/70 uppercase tracking-[0.2em] mb-1">Verified Host Hub</p>
+                                                <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-500/70 uppercase tracking-[0.2em] mb-1">Verified Host Hub</p>
                                                 <h3 className="text-base font-extrabold text-white tracking-tight">{event.institution.name}</h3>
-                                                <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase leading-relaxed">
+                                                <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 mt-1 uppercase leading-relaxed">
                                                     Officially verified campus infrastructure & authority.
                                                 </p>
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Faculty Lead for Sub-Events */}
+                                    {event.event_type === 'sub_event' && event.staff?.filter((s: any) => s.student && (s.role_name || s.role) === "Faculty Lead").map((s: any) => (
+                                        <div key={s.id} className="p-7 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-center gap-5 hover:border-amber-500/40 transition-all shadow-sm dark:shadow-none group">
+                                            <div className="w-16 h-16 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 overflow-hidden">
+                                                {s.student?.avatar_url ? (
+                                                    <img src={s.student.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-2xl font-black text-amber-500">{s.student?.full_name?.charAt(0) || "F"}</span>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">Sub-Event Faculty Lead</p>
+                                                <h3 className="text-base font-black text-white group-hover:text-amber-500 transition-colors uppercase italic">{s.student?.full_name}</h3>
+                                                <div className="flex items-center gap-1.5 mt-1.5">
+                                                    <Shield size={10} className="text-amber-500" />
+                                                    <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">Institutional Oversight</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
                                     {event.creator && (
-                                        <div className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
+                                        <div className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-rose-500/30 transition-all shadow-sm dark:shadow-none group">
                                             <div className="w-16 h-16 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0 overflow-hidden">
                                                 {event.creator.avatar_url ? (
                                                      <img src={event.creator.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -1449,55 +1470,64 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Event In-Charge</p>
-                                                <h3 className="text-base font-black text-white">{event.creator.full_name}</h3>
+                                                <p className="text-[9px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-1">Event In-Charge</p>
+                                                <h3 className="text-base font-black text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">{event.creator.full_name}</h3>
                                                 <div className="flex items-center gap-1.5 mt-1.5">
-                                                    <CheckCircle2 size={10} className="text-emerald-500" />
-                                                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Verified Faculty</span>
+                                                    <CheckCircle2 size={10} className="text-emerald-600 dark:text-emerald-500" />
+                                                    <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">Verified Faculty</span>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Student Coordinators */}
-                                    {event.staff?.filter((s: any) => (s.role_name || s.role) === "Overall Coordinator").map((s: any) => (
-                                        <div key={s.id} className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-zinc-700 transition-all">
+                                    {/* Student Coordinators / Hosts */}
+                                    {event.staff?.filter((s: any) => 
+                                        s.student && 
+                                        ["Overall Coordinator", "Overall Host", "Lead Organizer"].includes(s.role_name || s.role)
+                                    ).map((s: any) => (
+                                        <div key={s.id} className="p-7 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-5 hover:border-cyan-500/30 transition-all shadow-sm dark:shadow-none group">
                                             <div className="w-16 h-16 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 overflow-hidden">
-                                                {s.student.avatar_url ? (
+                                                {s.student?.avatar_url ? (
                                                     <img src={s.student.avatar_url} alt="" className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <span className="text-2xl font-black text-cyan-400">{s.student.full_name?.charAt(0) || "S"}</span>
+                                                    <span className="text-2xl font-black text-cyan-400">{s.student?.full_name?.charAt(0) || "S"}</span>
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="text-[9px] font-black text-cyan-500 uppercase tracking-widest mb-1">Overall Coordinator</p>
-                                                <h3 className="text-base font-black text-white">{s.student.full_name}</h3>
+                                                <p className="text-[9px] font-black text-cyan-600 dark:text-cyan-500 uppercase tracking-widest mb-1">{s.role_name || s.role}</p>
+                                                <h3 className="text-base font-black text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">{s.student?.full_name}</h3>
                                                 <div className="flex items-center gap-1.5 mt-1.5">
-                                                    <ShieldCheck size={10} className="text-cyan-500" />
-                                                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest text-nowrap">Student Project Lead</span>
+                                                    <ShieldCheck size={10} className="text-cyan-600 dark:text-cyan-500" />
+                                                    <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-widest text-nowrap">Student Project Lead</span>
                                                 </div>
                                             </div>
                                         </div>
                                     ))}
 
                                     {/* Other Staff (Minified view) */}
-                                    {(event.staff?.filter((s: any) => (s.role_name || s.role) !== "Overall Coordinator") || []).length > 0 && (
+                                    {(event.staff?.filter((s: any) => 
+                                        s.student && 
+                                        !["Overall Coordinator", "Overall Host", "Lead Organizer"].includes(s.role_name || s.role)
+                                    ) || []).length > 0 && (
                                         <div className="col-span-full pt-4">
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                {(event.staff?.filter((s: any) => (s.role_name || s.role) !== "Overall Coordinator") || []).map((s: any) => (
-                                                    <div key={s.id} className="p-4 bg-zinc-950/50 border border-white/5 rounded-xl flex flex-col items-center text-center gap-2">
-                                                        <div className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center overflow-hidden">
-                                                            {s.student.avatar_url ? (
+                                                {(event.staff?.filter((s: any) => 
+                                                    s.student && 
+                                                    !["Overall Coordinator", "Overall Host", "Lead Organizer"].includes(s.role_name || s.role)
+                                                ) || []).map((s: any) => (
+                                                    <div key={s.id} className="p-4 bg-zinc-900/50 dark:bg-zinc-950/50 border border-zinc-800 rounded-xl flex flex-col items-center text-center gap-2 shadow-sm dark:shadow-none">
+                                                        <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden">
+                                                            {s.student?.avatar_url ? (
                                                                 <img src={s.student.avatar_url} alt="" className="w-full h-full object-cover" />
                                                             ) : (
                                                                 <span className="text-[10px] font-black text-zinc-500">
-                                                                    {s.student.full_name?.split(' ').map((n: string) => n[0]).join('')}
+                                                                    {s.student?.full_name?.split(' ').map((n: string) => n[0]).join('')}
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <div>
-                                                            <p className="text-[9px] font-black text-white uppercase truncate px-2">{s.student.full_name}</p>
-                                                            <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">{s.role_name || s.role}</p>
+                                                            <p className="text-[9px] font-black text-white uppercase truncate px-2">{s.student?.full_name}</p>
+                                                            <p className="text-[8px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{s.role_name || s.role}</p>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -1514,12 +1544,12 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                             <div className="sticky top-24 space-y-5">
 
                                 {/* Primary Registration Card */}
-                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl dark:shadow-none transition-all">
                                     {/* Event mini-banner thumbnail */}
                                     {event.banner_url && (
                                         <div className="relative h-36 overflow-hidden">
-                                            <img src={event.banner_url} className="w-full h-full object-cover brightness-50" alt="" />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent" />
+                                            <img src={event.banner_url} className="w-full h-full object-cover brightness-[0.8] dark:brightness-50" alt="" />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 dark:from-zinc-900 dark:to-transparent" />
                                         </div>
                                     )}
 
@@ -1528,21 +1558,21 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         <div className="space-y-1">
                                             <div className="flex items-end justify-between">
                                                 <div>
-                                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Registration Fee</p>
+                                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Registration Fee</p>
                                                     <p className="text-3xl font-black text-white mt-0.5 tracking-tighter italic">Free</p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Seats</p>
-                                                    <p className="text-base font-black text-white">{registered}<span className="text-zinc-600 font-medium text-sm"> / {capacity}</span></p>
+                                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Seats</p>
+                                                    <p className="text-base font-black text-white">{registered}<span className="text-zinc-500 font-medium text-sm"> / {capacity}</span></p>
                                                 </div>
                                             </div>
                                             {/* Capacity bar */}
-                                            <div className="h-1.5 bg-zinc-950 rounded-full overflow-hidden mt-3">
+                                            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-950 rounded-full overflow-hidden mt-3 shadow-inner">
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${fillPct}%` }}
                                                     transition={{ duration: 0.8, ease: "easeOut" }}
-                                                    className={cn("h-full rounded-full", fillPct > 80 ? "bg-rose-500" : "bg-indigo-500")}
+                                                    className={cn("h-full rounded-full", fillPct > 80 ? "bg-rose-500" : "bg-indigo-600 dark:bg-indigo-500")}
                                                 />
                                             </div>
                                         </div>
@@ -1552,23 +1582,23 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                             <div className="flex items-center gap-3 py-3 border-b border-zinc-800">
                                                 <Calendar size={15} className="text-indigo-400 shrink-0" />
                                                 <div>
-                                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Date</p>
-                                                    <p className="text-xs font-bold text-zinc-200">{fmtDateLong(event.start_time)}</p>
+                                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">Date</p>
+                                                    <p className="text-xs font-bold text-zinc-100">{fmtDateLong(event.start_time)}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3 py-3 border-b border-zinc-800">
                                                 <Clock size={15} className="text-rose-400 shrink-0" />
                                                 <div>
-                                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Time</p>
-                                                    <p className="text-xs font-bold text-zinc-200">{fmtTime(event.start_time)} — {fmtTime(event.end_time)}</p>
+                                                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">Time</p>
+                                                    <p className="text-xs font-bold text-zinc-100">{fmtTime(event.start_time)} — {fmtTime(event.end_time)}</p>
                                                 </div>
                                             </div>
                                             {event.venue?.name && (
                                                 <div className="flex items-center gap-3 py-3">
                                                     <MapPin size={15} className="text-amber-400 shrink-0" />
                                                     <div>
-                                                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Venue</p>
-                                                        <p className="text-xs font-bold text-zinc-200">{event.venue.name}</p>
+                                                        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest leading-none mb-1">Venue</p>
+                                                        <p className="text-xs font-bold text-zinc-100">{event.venue.name}</p>
                                                     </div>
                                                 </div>
                                             )}
@@ -1581,7 +1611,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     href={event.rulebook_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="w-full h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white transition-all group"
+                                                    className="w-full h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-500 text-[10px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white transition-all group shadow-sm dark:shadow-none"
                                                 >
                                                     <ScrollText size={14} /> Read Rulebook
                                                 </a>
@@ -1610,20 +1640,36 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                             className={cn(
                                                                 "w-full h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
                                                                 (regStatus === "registered" || regStatus === "confirmed")
-                                                                    ? "bg-emerald-500 text-black shadow-xl shadow-emerald-500/20"
+                                                                    ? "bg-emerald-500 text-white dark:text-zinc-100 shadow-xl shadow-emerald-500/20"
                                                                     : (isOrganizer || isSoldOut || (event.reg_start_time && new Date() < new Date(event.reg_start_time)) || (event.reg_end_time && new Date() > new Date(event.reg_end_time)))
-                                                                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5"
-                                                                        : "bg-white text-black hover:bg-zinc-200 shadow-2xl shadow-white/10"
+                                                                        ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-800"
+                                                                        : "bg-zinc-950 dark:bg-zinc-950 text-white dark:text-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-2xl shadow-zinc-950/20 dark:shadow-white/10 transition-all"
                                                             )}
                                                         >
                                                             {previewMode && <><ShieldCheck size={14} /> Preview Mode</>}
                                                             {!previewMode && regStatus === "loading" && <><Loader2 size={14} className="animate-spin" /> Loading...</>}
                                                             {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={14} /> Registered</>}
-                                                            {isOrganizer && <><ShieldCheck size={14} /> Organizer Hub</>}
+                                                            {isOrganizer && (
+                                                                <div 
+                                                                    onClick={(e) => {
+                                                                        if (canEdit) {
+                                                                            e.stopPropagation();
+                                                                            router.push(`/faculty/event/${id}/manage`);
+                                                                        }
+                                                                    }}
+                                                                    className={cn(
+                                                                        "flex items-center gap-2",
+                                                                        canEdit ? "cursor-pointer hover:text-white transition-colors" : "cursor-not-allowed"
+                                                                    )}
+                                                                >
+                                                                    <ShieldCheck size={14} className={canEdit ? "text-cyan-400" : ""} /> 
+                                                                    {canEdit ? "Go to Mission Control" : "Organizer Hub"}
+                                                                </div>
+                                                            )}
                                                             {!previewMode && !isOrganizer && regStatus === "idle" && (event.reg_start_time && new Date() < new Date(event.reg_start_time)) && "Goes Live Soon"}
                                                             {!previewMode && !isOrganizer && regStatus === "idle" && (event.reg_end_time && new Date() > new Date(event.reg_end_time)) && "Expired"}
                                                             {!previewMode && !isOrganizer && regStatus === "idle" && !(event.reg_start_time && new Date() < new Date(event.reg_start_time)) && !(event.reg_end_time && new Date() > new Date(event.reg_end_time)) && !isSoldOut && (
-                                                                <><Ticket size={14} />{isComp ? "Register Now" : "Claim Pass"}</>
+                                                                <><Ticket size={14} /> {isComp ? "Register Now" : "Claim Pass"}</>
                                                             )}
                                                             {!previewMode && !isOrganizer && regStatus === "idle" && isSoldOut && "Sold Out"}
                                                             {regStatus === "pending" && "Pending Approval"}
@@ -1631,8 +1677,8 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                     )}
 
                                                     {isOrganizer && (
-                                                        <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
-                                                            <div className="flex items-center gap-3 text-amber-500">
+                                                        <div className="p-6 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 space-y-3 transition-all">
+                                                            <div className="flex items-center gap-3 text-amber-600 dark:text-amber-500">
                                                                 <AlertCircle size={20} />
                                                                 <p className="text-[10px] font-black uppercase tracking-widest">Organizer Access</p>
                                                             </div>
@@ -1648,7 +1694,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         {/* Resource & Community Links */}
                                         {event.resource_links && event.resource_links.length > 0 && (
                                             <div className="pt-6 border-t border-zinc-800 space-y-3">
-                                                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest px-1">Resources & Links</p>
+                                                <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Resources & Links</p>
                                                 <div className="grid grid-cols-1 gap-2">
                                                     {event.resource_links.map((link: any, idx: number) => {
                                                         const label = link.label.toLowerCase();
@@ -1660,18 +1706,18 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                                             <button
                                                                 key={idx}
                                                                 onClick={() => window.open(link.url, '_blank')}
-                                                                className="flex items-center justify-between p-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-all group"
+                                                                className="flex items-center justify-between p-4 bg-zinc-900 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-800 rounded-xl transition-all group shadow-sm dark:shadow-none"
                                                             >
                                                                 <div className="flex items-center gap-3">
                                                                     <div className={cn(
-                                                                        "p-2 rounded-lg bg-zinc-950 flex items-center justify-center transition-colors shadow-inner",
-                                                                        isWhatsApp ? "text-emerald-500" : isDiscord ? "text-indigo-400" : isPDF ? "text-rose-500" : "text-zinc-400"
+                                                                        "p-2 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center transition-colors shadow-inner",
+                                                                        isWhatsApp ? "text-emerald-600 dark:text-emerald-500" : isDiscord ? "text-indigo-400" : isPDF ? "text-rose-600 dark:text-rose-500" : "text-zinc-500"
                                                                     )}>
                                                                         {isWhatsApp || isDiscord ? <MessageSquare size={14} /> : isPDF ? <FileText size={14} /> : <ExternalLink size={14} />}
                                                                     </div>
-                                                                    <span className="text-[10px] font-black text-white uppercase tracking-tight">{link.label}</span>
+                                                                    <span className="text-[10px] font-black text-zinc-100 dark:text-white uppercase tracking-tight">{link.label}</span>
                                                                 </div>
-                                                                <ChevronRight size={14} className="text-zinc-700 group-hover:text-white transition-colors" />
+                                                                <ChevronRight size={14} className="text-zinc-400 group-hover:text-zinc-100 dark:group-hover:text-white transition-colors" />
                                                             </button>
                                                         );
                                                     })}
@@ -1682,7 +1728,7 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         {/* Share */}
                                         <button
                                             onClick={handleShare}
-                                            className="w-full h-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 transition-all text-zinc-500 hover:text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                            className="w-full h-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-900 dark:hover:bg-zinc-800 transition-all text-zinc-400 dark:text-zinc-500 hover:text-zinc-950 dark:hover:text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm dark:shadow-none"
                                         >
                                             {copied ? <Check size={13} className="text-emerald-400" /> : <Share2 size={13} />}
                                             {copied ? "Link Copied!" : "Share Event"}
@@ -1691,8 +1737,8 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                 </div>
 
                                 {/* Quick details card */}
-                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
-                                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest px-1">Event Details</p>
+                                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3 shadow-sm dark:shadow-none">
+                                    <p className="text-[9px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest px-1">Event Details</p>
                                     {([] as { icon: React.ReactNode; label: string; value: string; color: string }[])
                                         .concat([
                                             { icon: <Users size={13} />, label: "Format", value: "Individual", color: "text-cyan-400" },
@@ -1713,60 +1759,61 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
             )}
 
             {/* Sticky mobile action bar */}
-            {
-                !previewMode && !isObserver && event.status !== "completed" && (
-                    (() => {
-                        const now = new Date();
-                        const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
-                        const regEnd = event.reg_end_time ? new Date(event.reg_end_time) : null;
-                        const isNotStarted = !!(regStart && now < regStart);
-                        const isClosed = !!(regEnd && now > regEnd);
-                        
-                        return (
-                            <div className="fixed bottom-0 inset-x-0 z-[90] lg:hidden px-4 pb-6 pt-4"
-                                style={{ background: "linear-gradient(to top, rgba(9,9,11,0.98) 60%, transparent)", backdropFilter: "blur(16px)" }}>
-                                <button
-                                    onClick={handleRegister}
-                                    disabled={!!(isOrganizer || regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading" || isNotStarted || isClosed)}
-                                    className={cn(
-                                        "w-full h-14 rounded-xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
-                                        (regStatus === "registered" || regStatus === "confirmed")
-                                            ? "bg-emerald-500 text-black"
-                                            : (isOrganizer || isSoldOut || isNotStarted || isClosed)
-                                                ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                                                : "bg-indigo-500 text-white shadow-xl shadow-indigo-500/30 hover:bg-indigo-400"
-                                    )}
-                                >
-                                    {regStatus === "loading" && <Loader2 size={16} className="animate-spin" />}
-                                    {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={16} /> Registered</>}
-                                    {isOrganizer && <><ShieldCheck size={16} /> Organizer Access</>}
-                                    {!isOrganizer && isNotStarted && "Registration Not Started"}
-                                    {!isOrganizer && isClosed && "Registration Closed"}
-                                    {!isOrganizer && !isNotStarted && !isClosed && regStatus === "idle" && !isSoldOut && <><Ticket size={16} />{isComp ? "Register Now" : "Get Pass"}</>}
-                                    {!isOrganizer && !isNotStarted && !isClosed && regStatus === "idle" && isSoldOut && "Sold Out"}
-                                    {regStatus === "pending" && "Pending Approval"}
-                                    {regStatus === "waitlisted" && "You're Waitlisted"}
-                                </button>
-                            </div>
-                        );
-                    })()
-                )
-            }
+            {!previewMode && !isObserver && event.status !== "completed" && (
+                (() => {
+                    const now = new Date();
+                    const regStart = event.reg_start_time ? new Date(event.reg_start_time) : null;
+                    const regEnd = event.reg_end_time ? new Date(event.reg_end_time) : null;
+                    const isNotStarted = !!(regStart && now < regStart);
+                    const isClosed = !!(regEnd && now > regEnd);
+                    
+                    return (
+                        <div className="fixed bottom-0 inset-x-0 z-[90] lg:hidden px-4 pb-6 pt-4 bg-zinc-950/80 dark:bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+                            <button
+                                onClick={handleRegister}
+                                disabled={!!(isOrganizer || regStatus === "registered" || regStatus === "confirmed" || isSoldOut || regStatus === "loading" || isNotStarted || isClosed)}
+                                className={cn(
+                                    "w-full h-14 rounded-xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                                    (regStatus === "registered" || regStatus === "confirmed")
+                                        ? "bg-emerald-500 text-white dark:text-zinc-100"
+                                        : (isOrganizer || isSoldOut || isNotStarted || isClosed)
+                                            ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                                            : "bg-zinc-950 dark:bg-zinc-950 text-white dark:text-zinc-100 shadow-xl shadow-zinc-950/20 dark:shadow-white/10 hover:opacity-90 transition-all"
+                                )}
+                            >
+                                {regStatus === "loading" && <Loader2 size={16} className="animate-spin" />}
+                                {(regStatus === "registered" || regStatus === "confirmed") && <><CheckCircle2 size={16} /> Registered</>}
+                                {isOrganizer && <><ShieldCheck size={16} /> Organizer Access</>}
+                                {!isOrganizer && isNotStarted && "Registration Not Started"}
+                                {!isOrganizer && isClosed && "Registration Closed"}
+                                {!isOrganizer && !isNotStarted && !isClosed && regStatus === "idle" && !isSoldOut && <><Ticket size={16} />{isComp ? "Register Now" : "Get Pass"}</>}
+                                {!isOrganizer && !isNotStarted && !isClosed && regStatus === "idle" && isSoldOut && "Sold Out"}
+                                {regStatus === "pending" && "Pending Approval"}
+                                {regStatus === "waitlisted" && "You're Waitlisted"}
+                            </button>
+                        </div>
+                    );
+                })()
+            )}
 
             {/* Global styles for prose content */}
             <style jsx global>{`
                 .prose h1, .prose h2, .prose h3 {
-                    color: white !important;
+                    color: inherit !important;
                     font-weight: 700 !important;
                     margin-bottom: 1rem;
                 }
-                .prose p { color: #a1a1aa !important; margin-bottom: 1rem; }
+                .dark .prose h1, .dark .prose h2, .dark .prose h3 { color: white !important; }
+                .prose p { color: inherit !important; opacity: 0.8; margin-bottom: 1rem; }
                 .prose ul { padding-left: 1.25rem !important; margin-bottom: 1.5rem; }
-                .prose ul li { color: #a1a1aa !important; margin-bottom: 0.5rem; }
-                .prose strong { color: #818cf8 !important; font-weight: 700 !important; }
+                .prose ul li { color: inherit !important; opacity: 0.8; margin-bottom: 0.5rem; }
+                .prose strong { color: #4f46e5 !important; font-weight: 700 !important; }
+                .dark .prose strong { color: #818cf8 !important; }
                 ::-webkit-scrollbar { width: 6px; }
-                ::-webkit-scrollbar-track { background: #09090b; }
-                ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                .dark ::-webkit-scrollbar-track { background: #09090b; }
+                ::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 10px; }
+                .dark ::-webkit-scrollbar-thumb { background: #27272a; }
             `}</style>
 
             <AnimatePresence>
@@ -1805,13 +1852,13 @@ export function StudentEventView({ eventId, previewMode = false, onClosePreview 
                                         <Layers size={24} />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">{selectedRound.title}</h3>
-                                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Digital Submission Workspace</p>
+                                        <h3 className="text-xl font-black text-zinc-100 dark:text-white italic uppercase tracking-tighter">{selectedRound.title}</h3>
+                                        <p className="text-[10px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Digital Submission Workspace</p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setIsSubModalOpen(false)}
-                                    className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                                    className="w-10 h-10 rounded-full bg-zinc-950 dark:bg-zinc-900 flex items-center justify-center text-zinc-500 hover:text-zinc-100 dark:hover:text-white transition-colors border border-zinc-800 shadow-sm"
                                 >
                                     <X size={20} />
                                 </button>
@@ -1850,10 +1897,10 @@ function WinnerGallery({ prizes }: { prizes: EventPrize[] }) {
     const rest = winners.slice(3);
 
     const podiumStyle = (pos: number) => ({
-        1: { bar: "h-28", bg: "bg-amber-500/15", border: "border-amber-500/30", text: "text-amber-400", icon: <Trophy size={20} />, label: "1st Place" },
-        2: { bar: "h-20", bg: "bg-zinc-400/10", border: "border-zinc-400/20", text: "text-zinc-300", icon: <Medal size={18} />, label: "2nd Place" },
-        3: { bar: "h-14", bg: "bg-orange-700/10", border: "border-orange-700/20", text: "text-orange-500", icon: <Award size={16} />, label: "3rd Place" },
-    }[pos] ?? { bar: "h-10", bg: "bg-zinc-900", border: "border-zinc-800", text: "text-zinc-500", icon: null, label: `${pos}th Place` });
+        1: { bar: "h-28", bg: "bg-amber-500/10 dark:bg-amber-500/15", border: "border-amber-500/20 dark:border-amber-500/30", text: "text-amber-400", icon: <Trophy size={20} />, label: "1st Place" },
+        2: { bar: "h-20", bg: "bg-zinc-400/10", border: "border-zinc-800 dark:border-zinc-400/20", text: "text-zinc-400 dark:text-zinc-300", icon: <Medal size={18} />, label: "2nd Place" },
+        3: { bar: "h-14", bg: "bg-orange-700/10", border: "border-orange-200 dark:border-orange-700/20", text: "text-orange-700 dark:text-orange-500", icon: <Award size={16} />, label: "3rd Place" },
+    }[pos] ?? { bar: "h-10", bg: "bg-zinc-900 dark:bg-zinc-900", border: "border-zinc-800", text: "text-zinc-500", icon: null, label: `${pos}th Place` });
 
     return (
         <section className="space-y-8">
@@ -1891,9 +1938,9 @@ function WinnerGallery({ prizes }: { prizes: EventPrize[] }) {
                             {/* Name plate */}
                             <div className="px-3 pb-4 text-center space-y-0.5">
                                 <p className={cn("text-[9px] font-black uppercase tracking-widest", s.text)}>{s.label}</p>
-                                <p className="text-sm font-bold text-white leading-snug line-clamp-2">{name}</p>
-                                {dept && <p className="text-[9px] text-zinc-600 font-medium">{dept}</p>}
-                                {prize.reward && <p className="text-[9px] font-bold text-zinc-400">{prize.reward}</p>}
+                                <p className="text-sm font-bold text-zinc-100 dark:text-white leading-snug line-clamp-2">{name}</p>
+                                {dept && <p className="text-[9px] text-zinc-500 dark:text-zinc-400 font-medium">{dept}</p>}
+                                {prize.reward && <p className="text-[9px] font-bold text-zinc-500">{prize.reward}</p>}
                             </div>
                         </motion.div>
                     );
@@ -1904,14 +1951,14 @@ function WinnerGallery({ prizes }: { prizes: EventPrize[] }) {
             {rest.length > 0 && (
                 <div className="space-y-2">
                     {rest.map((prize, idx) => (
-                        <div key={prize.id} className="flex items-center gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
-                            <span className="text-sm font-black text-zinc-600 w-6 text-center">{prize.position}</span>
+                        <div key={prize.id} className="flex items-center gap-4 p-4 bg-zinc-900 dark:bg-zinc-900 border border-zinc-800 rounded-xl shadow-sm dark:shadow-none">
+                            <span className="text-sm font-black text-zinc-500 dark:text-zinc-400 w-6 text-center">{prize.position}</span>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-white truncate">
                                     {prize.winner?.full_name || prize.winner_team?.name || "Winner"}
                                 </p>
                                 {prize.winner?.department?.name && (
-                                    <p className="text-xs text-zinc-600">{prize.winner.department.name}</p>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">{prize.winner.department.name}</p>
                                 )}
                             </div>
                             <p className="text-xs text-zinc-500 shrink-0">{prize.title}</p>
@@ -1932,12 +1979,12 @@ function WinnersSection({ prizes }: { prizes: EventPrize[] }) {
 // ── Generic Detail Row ────────────────────────────────────────────────────────
 function DetailRow({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
     return (
-        <div className="flex items-center justify-between py-3 border-b border-zinc-800/30 last:border-0 hover:bg-zinc-900 transition-colors rounded-xl px-2 -mx-2">
+        <div className="flex items-center justify-between py-3 border-b border-zinc-800/30 last:border-0 hover:bg-zinc-900 dark:hover:bg-zinc-900 transition-colors rounded-xl px-2 -mx-2">
             <div className="flex items-center gap-3">
-                <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-950 border border-zinc-800", color)}>
+                <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 border border-zinc-800 shadow-sm dark:shadow-none", color)}>
                     {icon}
                 </div>
-                <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{label}</span>
+                <span className="text-[9px] font-black text-zinc-500 dark:text-zinc-500 uppercase tracking-widest">{label}</span>
             </div>
             <span className="text-[10px] font-black text-white uppercase tracking-tight italic">{value}</span>
         </div>
@@ -1965,8 +2012,8 @@ function DomainNavButton({ active, onClick, label }: { active: boolean; onClick:
             className={cn(
                 "relative h-10 px-6 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
                 active
-                    ? "bg-white text-black shadow-lg shadow-white/10 scale-105"
-                    : "bg-zinc-900 text-zinc-500 hover:bg-zinc-800 hover:text-white"
+                    ? "bg-zinc-950 dark:bg-zinc-950 text-white dark:text-zinc-100 shadow-lg shadow-zinc-950/10 dark:shadow-white/10 scale-105"
+                    : "bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-100 dark:hover:text-white"
             )}
         >
             {label}
@@ -1985,12 +2032,12 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
     return (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 backdrop-blur-3xl bg-[#09090b]/80">
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 backdrop-blur-3xl bg-zinc-950/20 dark:bg-[#09090b]/80">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-3xl overflow-hidden"
+                className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-xl shadow-3xl overflow-hidden shadow-2xl dark:shadow-none"
             >
                 <div className="p-10 space-y-8">
                     <div className="flex items-center justify-between">
@@ -1999,9 +2046,9 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                                 Select Entry Track
                                 <div className="h-1 w-8 bg-indigo-500 rounded-full" />
                             </h3>
-                            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-[0.2em]">Select your specific competition category</p>
+                            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-[0.2em]">Select your specific competition category</p>
                         </div>
-                        <button onClick={onClose} className="p-3 rounded-xl hover:bg-zinc-900 text-zinc-600 transition-all">
+                        <button onClick={onClose} className="p-3 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 transition-all">
                             <X size={20} />
                         </button>
                     </div>
@@ -2012,7 +2059,7 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                             <ScrollText size={18} />
                         </div>
                         <div className="space-y-1">
-                            <p className="text-[11px] font-black text-white uppercase tracking-widest">Action Required</p>
+                            <p className="text-[11px] font-black text-amber-700 dark:text-white uppercase tracking-widest">Action Required</p>
                             <p className="text-[10px] font-medium text-zinc-400 leading-relaxed">
                                 ⚠️ Please ensure you have read the {" "}
                                 {rulebookUrl ? (
@@ -2041,27 +2088,27 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                                     "p-6 rounded-xl border text-left transition-all relative overflow-hidden group/item",
                                     selectedId === track.id
                                         ? "bg-indigo-500 border-indigo-500 shadow-xl shadow-indigo-500/10"
-                                        : "bg-zinc-900 border border-zinc-800 hover:border-zinc-700"
+                                        : "bg-zinc-100 dark:bg-zinc-900 border border-zinc-800 hover:border-indigo-500/30 shadow-sm dark:shadow-none"
                                 )}
                             >
                                 <div className="flex items-center justify-between relative z-10 font-black">
                                     <div className="space-y-1">
-                                        <p className={cn("text-base tracking-tight uppercase italic transition-colors", selectedId === track.id ? "text-white" : "text-zinc-500 group-hover/item:text-zinc-300")}>{track.name}</p>
+                                        <p className={cn("text-base tracking-tight uppercase italic transition-colors", selectedId === track.id ? "text-white" : "text-zinc-500 dark:text-zinc-500 group-hover/item:text-zinc-100 dark:group-hover/item:text-zinc-300")}>{track.name}</p>
                                         <div className="flex items-center gap-2">
                                             <span className={cn(
                                                 "text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md",
-                                                selectedId === track.id ? "bg-white/20 text-white" : "bg-black/40 text-zinc-600"
+                                                selectedId === track.id ? "bg-zinc-950/20 text-white" : "bg-zinc-950 dark:bg-black/40 text-zinc-500 dark:text-zinc-400 border border-zinc-800"
                                             )}>
                                                 {track.is_team ? "Team Required" : "Individual Entry"}
                                             </span>
                                         </div>
                                     </div>
                                     {selectedId === track.id ? (
-                                        <div className="w-10 h-10 rounded-xl bg-white text-indigo-500 flex items-center justify-center shadow-xl">
+                                        <div className="w-10 h-10 rounded-xl bg-zinc-950 text-indigo-500 flex items-center justify-center shadow-xl">
                                             <Check size={20} strokeWidth={4} />
                                         </div>
                                     ) : (
-                                        <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-800">
+                                        <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-800 shadow-sm">
                                             <ArrowRight size={20} />
                                         </div>
                                     )}
@@ -2076,7 +2123,7 @@ function TrackSelectionModal({ isOpen, onClose, tracks, eventId, onComplete, rul
                             const track = tracks.find(t => t.id === selectedId);
                             if (track) onComplete(track);
                         }}
-                        className="w-full h-16 rounded-[1.5rem] bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-indigo-500 hover:text-white transition-all shadow-xl disabled:opacity-30 disabled:grayscale active:scale-95"
+                        className="w-full h-16 rounded-[1.5rem] bg-zinc-950 dark:bg-zinc-950 text-white dark:text-zinc-100 text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-indigo-600 dark:hover:bg-indigo-500 hover:text-white transition-all shadow-xl disabled:opacity-30 disabled:grayscale active:scale-95"
                     >
                         Confirm Entry Track <CheckCircle2 size={16} />
                     </button>

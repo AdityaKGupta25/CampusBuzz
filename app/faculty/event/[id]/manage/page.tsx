@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -9,6 +9,7 @@ import "react-quill-new/dist/quill.snow.css";
 import {
     LayoutDashboard,
     Layers,
+    Info,
     ClipboardCheck,
     Trophy,
     Settings,
@@ -32,6 +33,7 @@ import {
     Type,
     Eye,
     ArrowRight,
+    ArrowLeft,
     MapPin,
     Users,
     Calendar,
@@ -72,6 +74,12 @@ import {
     Video,
     AlertTriangle,
     Box,
+    Radio,
+    QrCode,
+    LayoutList,
+    FileCheck,
+    BarChart3,
+    Lock
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -187,6 +195,7 @@ interface EventData {
     is_public?: boolean;
     is_umbrella: boolean;
     event_type: string;
+    event_subtype: string | null;
     parent_event_id: string | null;
     participation_tracks?: { id: string; name: string; is_team: boolean }[];
     rulebook_url?: string | null;
@@ -194,6 +203,7 @@ interface EventData {
     rejection_reason?: string | null;
     reg_start_time?: string | null;
     reg_end_time?: string | null;
+    parent?: { title: string } | null;
 }
 
 interface ConflictStatus {
@@ -229,11 +239,11 @@ interface Club {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-function EventManageDashboardInner() {
+export function EventManageDashboardInner({ propEventId, onClose }: { propEventId?: string; onClose?: () => void }) {
     const { user } = useUser();
     const params = useParams();
     const router = useRouter();
-    const eventId = params.id as string;
+    const eventId = propEventId || (params.id as string);
 
     const searchParams = useSearchParams();
     const initialTab = searchParams.get("tab") || "overview";
@@ -258,6 +268,21 @@ function EventManageDashboardInner() {
     const [eventStaff, setEventStaff] = useState<any[]>([]);
     const [isStaffStudent, setIsStaffStudent] = useState(false);
     const [canStudentEdit, setCanStudentEdit] = useState(false);
+    const [isParentHost, setIsParentHost] = useState(false);
+    const [openSection, setOpenSection] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (event && !openSection) {
+            const status = event.status;
+            if (['draft', 'review_pending', 'pending', 'revision_required', 'changes_requested', 'rejected'].includes(status)) {
+                setOpenSection("planning");
+            } else if (['approved', 'live'].includes(status)) {
+                setOpenSection("execution");
+            } else if (['completed', 'archived'].includes(status)) {
+                setOpenSection("outcome");
+            }
+        }
+    }, [event]);
 
 
     // Smart Conflict States
@@ -267,7 +292,25 @@ function EventManageDashboardInner() {
 
     const isArchived = event?.status === "archived";
     const isLocked = event?.status === "completed" || isArchived;
-    const isReadOnly = isLocked || (isStaffStudent && ['review_pending', 'pending', 'approved', 'live', 'completed', 'archived'].includes(event?.status || ''));
+    const isReadOnly = isLocked || (isStaffStudent && ['review_pending', 'pending', 'approved', 'live', 'completed', 'archived'].includes(event?.status || '') && !event?.is_umbrella);
+
+    // Lifecycle stage flags — used by sidebar navigation
+    const _eventStatus = event?.status || 'draft';
+    const isPlanning = ['draft', 'review_pending', 'pending', 'revision_required', 'changes_requested', 'rejected'].includes(_eventStatus);
+    const isExecution = ['approved', 'live'].includes(_eventStatus);
+    const isOutcome = ['completed', 'archived'].includes(_eventStatus);
+
+    // ── Phase Scope Locking ──
+    const strictlyPlanningTabs = ['overview', 'organizers', 'domains', 'sub-events', 'rounds', 'registration', 'prizes', 'faqs', 'sponsors'];
+    const executionTabs = ['submissions', 'broadcast', 'scanner'];
+    
+    // Check if the current tab belongs to a phase that is already over
+    const isTabPastScope = (activeTab !== 'settings') && (
+        (isExecution && strictlyPlanningTabs.includes(activeTab) && !(event?.is_umbrella && (activeTab === 'sub-events' || activeTab === 'domains'))) ||
+        (isOutcome && (strictlyPlanningTabs.includes(activeTab) || executionTabs.includes(activeTab)))
+    );
+
+    const isEffectiveReadOnly = isReadOnly || isTabPastScope;
 
     // ── Staff Access Guard ──
     const [userStaffRecord, setUserStaffRecord] = useState<any>(null);
@@ -315,7 +358,7 @@ function EventManageDashboardInner() {
                 // Phase 1: Fetch event itself — strictly scoped
                 const { data: eventData, error: eventErr } = await supabase
                     .from("events")
-                    .select("*, governance_note, rejection_reason")
+                    .select("*, governance_note, rejection_reason, parent:parent_event_id(title)")
                     .eq("id", eventId)
                     .eq("institution_id", institutionId)
                     .single();
@@ -335,6 +378,8 @@ function EventManageDashboardInner() {
                 }
 
                 const allRelevantIds = [eventId, ...subEventIds];
+                const staffIdsToCheck = [eventId];
+                if (eventData.parent_event_id) staffIdsToCheck.push(eventData.parent_event_id);
 
                 // Phase 3: Parallel fetch everything else — all strictly joins or scoped
                 const [roundsRes, prizesRes, venuesRes, clubsRes, regsRes, subEventsRes, festDomainsRes, staffRes] = await Promise.all([
@@ -345,26 +390,50 @@ function EventManageDashboardInner() {
                     supabase.from("registrations").select("*, student:users(full_name, email, department:departments(name)), event:events!inner(institution_id)").in("event_id", allRelevantIds).eq("event.institution_id", institutionId),
                     supabase.from("events").select("id, title, status, start_time, end_time, registered_count, attended_count, fest_domain_id, fest_category, club_id").eq("parent_event_id", eventId).eq("institution_id", institutionId).order("start_time"),
                     supabase.from("fest_domains").select("*").eq("umbrella_event_id", eventId).order("created_at"),
-                    supabase.from("event_staff").select("*, student:student_id(id, full_name, email, role, department:departments(name))").eq("event_id", eventId).order("assigned_at", { ascending: false })
+                    supabase.from("event_staff").select("*, student:student_id(id, full_name, email, role, department:departments(name))").in("event_id", staffIdsToCheck).order("assigned_at", { ascending: false })
                 ]);
 
                 // Phase 4: State updates
                 const currentUserId = (user as any)?.dbId || (user as any)?.id;
-                const userStaffRecord = staffRes.data?.find(s => 
+                const relevantStaff = staffRes.data || [];
+                
+                const isStudent = user?.role === 'student';
+                const isCreator = (eventData.creator_id === currentUserId);
+
+                // Permission Check: Check both current event and parent event
+                let userStaffRecords = (relevantStaff || []).filter(s => 
                     s.student_id === currentUserId || 
                     s.student?.id === currentUserId
                 );
                 
-                const isStudent = user?.role === 'student';
-                const isCreator = eventData.creator_id === currentUserId;
+                let hasEditPermission = userStaffRecords.some(s => s.grant_edit_access);
+                let isParentAuthorized = userStaffRecords.some(s => s.event_id === eventData.parent_event_id && s.grant_edit_access);
 
-                // Students must be either the creator or staff with edit access
-                if (isStudent && !isCreator && !userStaffRecord?.grant_edit_access) {
+                // Fallback: If not found in general list (likely due to RLS), try targeted fetch for current user
+                if (!hasEditPermission && !isCreator) {
+                    const { data: myStaffRecords } = await supabase
+                        .from("event_staff")
+                        .select("id, grant_edit_access, event_id")
+                        .eq("student_id", currentUserId)
+                        .in("event_id", staffIdsToCheck);
+
+                    if (myStaffRecords && myStaffRecords.length > 0) {
+                        hasEditPermission = myStaffRecords.some(r => r.grant_edit_access);
+                        isParentAuthorized = myStaffRecords.some(r => r.event_id === eventData.parent_event_id && r.grant_edit_access);
+                    }
+                }
+                
+                // Security Verification: If a student tries to access, ensure they have delegate credentials
+                // Logic: Access IF in staff table AND can_edit_event is true (or they are the creator)
+                if (isStudent && !isCreator && !hasEditPermission) {
                     throw new Error("Access Denied: You do not have delegate editing credentials for this mission. Please contact the Faculty In-Charge.");
                 }
 
-                setIsStaffStudent(isStudent);
-                setCanStudentEdit(isCreator || !!userStaffRecord?.grant_edit_access);
+                if (isStudent) {
+                    setIsStaffStudent(true);
+                    setCanStudentEdit(hasEditPermission);
+                    setIsParentHost(isParentAuthorized);
+                }
 
                 setEvent({
                     ...eventData,
@@ -398,7 +467,7 @@ function EventManageDashboardInner() {
                 if (regsRes.data) setRegistrations(regsRes.data);
                 if (subEventsRes.data) setSubEventsState(subEventsRes.data);
                 if (festDomainsRes.data) setFestDomains(festDomainsRes.data);
-                if (staffRes.data) setEventStaff(staffRes.data);
+                if (relevantStaff) setEventStaff(relevantStaff.filter(s => s.event_id === eventId));
 
                 // Initial submissions fetch if no round is selected (fallback)
                 if (!firstDigitalId) {
@@ -447,6 +516,68 @@ function EventManageDashboardInner() {
 
         fetchRoundSubmissions();
     }, [selectedSubmissionRoundId, user?.institution_id]);
+
+    // ─── Save & Next Navigation Logic ───
+    const getTabSequence = useCallback(() => {
+        if (!event) return [];
+
+        // Immersive Blueprint Editor Sequence for Students
+        if (isStaffStudent) {
+            const seq = ['overview'];
+            // Rounds only apply to regular events (competitions or experiences)
+            if (event.event_type !== 'umbrella') {
+                seq.push('rounds');
+            }
+            seq.push('registration', 'prizes', 'faqs', 'sponsors');
+            return seq;
+        }
+
+        const seq = ['overview', 'organizers'];
+        if (event.event_type === 'umbrella') {
+            seq.push('domains', 'sub-events');
+        }
+        seq.push('rounds', 'registration', 'prizes', 'faqs', 'sponsors');
+        if (!isStaffStudent) {
+            seq.push('settings');
+        }
+        return seq;
+    }, [event, isStaffStudent]);
+
+    const handleSaveAndNext = async () => {
+        const sequence = getTabSequence();
+        const currentIndex = sequence.indexOf(activeTab);
+        if (currentIndex === -1 || currentIndex === sequence.length - 1) return;
+
+        // 1. Trigger Save Logic for specific tabs
+        let success = true;
+        try {
+            if (!isEffectiveReadOnly && ['overview', 'faqs', 'sponsors', 'settings', 'registration'].includes(activeTab)) {
+                await handleSaveAll();
+            }
+        } catch (err) {
+            success = false;
+        }
+
+        // 2. Transition
+        if (success) {
+            const nextTab = sequence[currentIndex + 1];
+            setActiveTab(nextTab);
+            // Scroll content to top
+            const contentArea = document.querySelector('.overflow-y-auto');
+            if (contentArea) contentArea.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
+    const handlePrevious = () => {
+        const sequence = getTabSequence();
+        const currentIndex = sequence.indexOf(activeTab);
+        if (currentIndex <= 0) return;
+
+        const prevTab = sequence[currentIndex - 1];
+        setActiveTab(prevTab);
+        const contentArea = document.querySelector('.overflow-y-auto');
+        if (contentArea) contentArea.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     // ── Smart Conflict Detection ─────────────────────────────────────────────
     const check_smart_conflict = React.useCallback(async () => {
@@ -658,6 +789,7 @@ function EventManageDashboardInner() {
 
             if (isStaffStudent) {
                 showMessage("Success! Your mission blueprint has been sent to the Faculty In-Charge for review. 🚀");
+                if (onClose) setTimeout(() => onClose(), 2000);
             } else if (nextStatus === "live") {
                 showMessage("Success! Mission is now LIVE on the student marketplace. 🚀");
             } else {
@@ -1065,7 +1197,7 @@ function EventManageDashboardInner() {
             // Definitive refresh
             const { data: verifiedSubEvents } = await supabase
                 .from("events")
-                .select("id, title, status, start_time, end_time, registered_count, attended_count, fest_domain_id, fest_category, club_id")
+                .select("id, title, status, start_time, end_time, registered_count, fest_domain_id, fest_category, club_id")
                 .eq("parent_event_id", eventId)
                 .eq("institution_id", user?.institution_id || "")
                 .order("start_time");
@@ -1152,8 +1284,8 @@ function EventManageDashboardInner() {
 
             {/* 1. Sidebar */}
             <aside className={cn(
-                "bg-zinc-950 border-r border-white/5 flex flex-col z-50 transition-all",
-                isStaffStudent ? "w-72" : "w-64"
+                "bg-zinc-950 border-r border-zinc-800 flex flex-col z-50 transition-all shadow-2xl",
+                isStaffStudent ? "w-80" : "w-72"
             )}>
                 <style jsx global>{`
                     @keyframes shimmer {
@@ -1168,7 +1300,7 @@ function EventManageDashboardInner() {
                     }
                 `}</style>
 
-                <div className="p-8">
+                <div className="p-6">
                     {!isStaffStudent && (
                         <button
                             onClick={() => {
@@ -1188,11 +1320,19 @@ function EventManageDashboardInner() {
                     {isStaffStudent && (
                         <div className="mb-12 mt-4">
                             <button
-                                onClick={() => router.push("/student/feed")}
+                                onClick={() => {
+                                    if (event?.parent_event_id && isParentHost) {
+                                        router.push(`/faculty/event/${event.parent_event_id}/manage?tab=sub-events`);
+                                    } else if (onClose) {
+                                        onClose();
+                                    } else {
+                                        router.push("/student/feed");
+                                    }
+                                }}
                                 className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-[0.2em] mb-8 group"
                             >
                                 <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-                                Exit Editor
+                                {event?.parent_event_id && isParentHost ? "Back to Mega Fest" : "Exit Editor"}
                             </button>
                             <div className="flex items-center gap-3 px-2 mb-8">
                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
@@ -1206,86 +1346,122 @@ function EventManageDashboardInner() {
                     {/* Event Identity Header */}
                     {!loading && event && (
                         <div className="mb-10 space-y-3 px-4">
+                            {isStaffStudent ? (
+                                <p className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.4em] italic mb-1">MISSION_BLUEPRINT</p>
+                            ) : (
+                                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-1">Operational Authority</p>
+                            )}
                             <h2 className="text-[11px] font-black text-white tracking-tight uppercase line-clamp-2 leading-tight italic opacity-90">{event.title}</h2>
                             <div className="flex items-center">
-                                {event.event_type === 'umbrella' && <Badge icon={<Zap size={10} />} label="Mega Fest" variant="amber" />}
+                                {event.event_type === 'umbrella' && (
+                                    <Badge 
+                                        icon={<Zap size={10} />} 
+                                        label={event.event_subtype === 'fest' ? "Mega Fest" : "Activity Hub"} 
+                                        variant="amber" 
+                                    />
+                                )}
                                 {event.event_type === 'sub_event' && <Badge icon={<Layers size={10} />} label="Sub-Event" variant="cyan" />}
                             </div>
                         </div>
                     )}
 
-                    <nav className="space-y-2">
+                    <nav className="flex-1 overflow-y-auto px-4 space-y-4 custom-scrollbar scrollbar-hide pt-4 relative overflow-x-hidden">
                         {loading ? (
-                            <div className="space-y-4 pt-4">
+                            <div className="space-y-2 pt-4">
                                 {[...Array(8)].map((_, i) => (
-                                    <div key={i} className="h-10 w-full bg-white/5 rounded-xl animate-pulse" />
+                                    <div key={i} className="h-8 w-full bg-zinc-900 rounded-xl animate-pulse" />
                                 ))}
                             </div>
                         ) : (
                             <>
-                                {/* Context-Aware Navigation */}
-                                {(() => {
-                                    const type = event?.event_type;
-                                    const isComp = event?.is_competition !== false; // Active by default
-                                    return (
-                                        <>
-                                            <NavButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")} icon={<LayoutDashboard size={18} />} label="Overview" />
+                                {/* Mission Timeline Line */}
+                                <div className="absolute left-[19.5px] top-6 bottom-6 w-[1px] bg-zinc-800/80 -z-10" />
+                                <div className={cn(
+                                    "absolute left-[19.5px] top-6 w-[1px] transition-all duration-1000 bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.3)] -z-10",
+                                    isPlanning ? "h-[10%]" : isExecution ? "h-[50%]" : "h-full"
+                                )} />
 
-                                            {type === 'umbrella' && (
-                                                <>
-                                                    {!isStaffStudent && <NavButton active={activeTab === "domains"} onClick={() => setActiveTab("domains")} icon={<Globe size={18} />} label="Domains & Verticals" />}
-                                                    <NavButton active={activeTab === "sub-events"} onClick={() => setActiveTab("sub-events")} icon={<Layers size={18} />} label="Sub-Events" />
-                                                </>
-                                            )}
+                                {event && (
+                                    <div className="space-y-2">
+                                        {/* STAGE 1: STRATEGIC PLANNING */}
+                                        <AccordionSection
+                                            title="Stage 1: Strategic Planning"
+                                            isOpen={openSection === "planning"}
+                                            onToggle={() => setOpenSection(openSection === "planning" ? null : "planning")}
+                                            isLocked={false} 
+                                            isCompleted={isExecution || isOutcome}
+                                            isActive={isPlanning}
+                                            badge={(isExecution || isOutcome) ? "LOCKED" : undefined}
+                                        >
+                                            <div className="space-y-0.5">
+                                                <NavButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")} icon={<Info size={16} />} label="Overview" />
+                                                <NavButton active={activeTab === "organizers"} onClick={() => setActiveTab("organizers")} icon={<Users size={16} />} label="Manage Organizers" />
+                                                {event.is_umbrella && (
+                                                    <>
+                                                        <NavButton active={activeTab === "domains"} onClick={() => setActiveTab("domains")} icon={<Layers size={16} />} label="Domains & Verticals" />
+                                                        <NavButton active={activeTab === "sub-events"} onClick={() => setActiveTab("sub-events")} icon={<CheckSquare size={16} />} label="Sub-Events" />
+                                                    </>
+                                                )}
+                                                {!event.is_umbrella && (
+                                                    <NavButton active={activeTab === "rounds"} onClick={() => setActiveTab("rounds")} icon={<LayoutList size={16} />} label={event.is_competition ? "Rounds & Schedule" : "Phases & Schedule"} />
+                                                )}
+                                                <NavButton active={activeTab === "registration"} onClick={() => setActiveTab("registration")} icon={<ClipboardCheck size={16} />} label={event.is_umbrella ? "Entry Pass" : "Registration"} />
+                                                <NavButton active={activeTab === "prizes"} onClick={() => setActiveTab("prizes")} icon={<Trophy size={16} />} label={event.is_umbrella ? "Overall Prizes" : "Prizes & Rewards"} />
+                                                <NavButton active={activeTab === "faqs"} onClick={() => setActiveTab("faqs")} icon={<HelpCircle size={16} />} label="FAQs" />
+                                                <NavButton active={activeTab === "sponsors"} onClick={() => setActiveTab("sponsors")} icon={<Handshake size={16} />} label="Partners" />
+                                            </div>
+                                        </AccordionSection>
 
-                                            {type !== 'umbrella' && (
-                                                <>
-                                                    {isComp && <NavButton active={activeTab === "rounds"} onClick={() => setActiveTab("rounds")} icon={<Layers size={18} />} label="Rounds & Schedule" />}
-                                                    <NavButton
-                                                        active={activeTab === "registration"}
-                                                        onClick={() => setActiveTab("registration")}
-                                                        icon={<ClipboardCheck size={18} />}
-                                                        label={isComp ? "Registration Form" : "Ticketing / RSVP"}
-                                                    />
-                                                    {isComp && <NavButton active={activeTab === "submissions"} onClick={() => setActiveTab("submissions")} icon={<FileText size={18} />} label="Submissions & Scoring" />}
-                                                </>
-                                            )}
+                                        {/* STAGE 2: OPERATIONAL EXECUTION */}
+                                        {!isStaffStudent && (
+                                            <AccordionSection
+                                                title="Stage 2: Operational Execution"
+                                                isOpen={openSection === "execution"}
+                                                onToggle={() => setOpenSection(openSection === "execution" ? null : "execution")}
+                                                isLocked={isPlanning}
+                                                isCompleted={isOutcome}
+                                                onLockClick={() => {}}
+                                                isActive={isExecution}
+                                            >
+                                                <div className="space-y-0.5">
+                                                    {!event.event_type.includes('experience') && (
+                                                        <NavButton active={activeTab === "submissions"} onClick={() => setActiveTab("submissions")} icon={<FileCheck size={16} />} label="Submissions" />
+                                                    )}
+                                                    <NavButton active={activeTab === "broadcast"} onClick={() => setActiveTab("broadcast")} icon={<Radio size={16} />} label="Broadcast" />
+                                                    <NavButton active={activeTab === "scanner"} onClick={() => setActiveTab("scanner")} icon={<QrCode size={16} />} label="Scan QR" />
+                                                </div>
+                                            </AccordionSection>
+                                        )}
 
-                                            <NavButton
-                                                active={activeTab === "prizes"}
-                                                onClick={() => setActiveTab("prizes")}
-                                                icon={<Trophy size={18} />}
-                                                label={
-                                                    type === 'umbrella'
-                                                        ? "Prizes (Global)"
-                                                        : isComp
-                                                            ? "Prizes & Rewards"
-                                                            : "Giveaways & Perks"
-                                                }
-                                            />
+                                        {/* STAGE 3: MISSION OUTCOMES */}
+                                        {!isStaffStudent && (
+                                            <AccordionSection
+                                                title="Stage 3: Mission Outcomes"
+                                                isOpen={openSection === "outcome"}
+                                                onToggle={() => setOpenSection(openSection === "outcome" ? null : "outcome")}
+                                                isLocked={isPlanning || isExecution}
+                                                isCompleted={false}
+                                                onLockClick={() => {}}
+                                                isActive={isOutcome}
+                                            >
+                                                <div className="space-y-0.5">
+                                                    {!event.event_type.includes('experience') && (
+                                                        <NavButton active={activeTab === "results"} onClick={() => setActiveTab("results")} icon={<Medal size={16} />} label="Results & Closure" />
+                                                    )}
+                                                    <NavButton active={activeTab === "reports"} onClick={() => setActiveTab("reports")} icon={<BarChart3 size={16} />} label="Impact Report" />
+                                                </div>
+                                            </AccordionSection>
+                                        )}
+                                    </div>
+                                )}
 
-                                            <NavButton active={activeTab === "faqs"} onClick={() => setActiveTab("faqs")} icon={<HelpCircle size={18} />} label="FAQs" />
-
-                                            <NavButton active={activeTab === "sponsors"} onClick={() => setActiveTab("sponsors")} icon={<Handshake size={18} />} label="Sponsors & Partners" />
-
-                                            {!isStaffStudent && (
-                                                <NavButton
-                                                    active={activeTab === "reports"}
-                                                    onClick={() => setActiveTab("reports")}
-                                                    icon={<FileBarChart size={18} />}
-                                                    label={type === 'umbrella' ? "Reports & Analytics (Global)" : "Reports & Analytics"}
-                                                />
-                                            )}
-
-                                            {type !== 'umbrella' && isComp && (
-                                                <NavButton active={activeTab === "results"} onClick={() => setActiveTab("results")} icon={<CheckSquare size={18} />} label="Results & Closure" />
-                                            )}
-
-                                            <NavButton active={activeTab === "organizers"} onClick={() => setActiveTab("organizers")} icon={<Users size={18} />} label="Manage Organizers" />
-                                            {!isStaffStudent && <NavButton active={activeTab === "settings"} onClick={() => setActiveTab("settings")} icon={<Settings size={18} />} label="Settings (Governance)" />}
-                                        </>
-                                    );
-                                })()}
+                                {/* GLOBAL CONFIG */}
+                                {!loading && event && !isStaffStudent && (
+                                    <div className="pt-4 border-t border-zinc-900 mt-4 space-y-2">
+                                        <p className="px-4 text-[8px] font-black text-zinc-700 uppercase tracking-[0.3em]">Global Config</p>
+                                        <NavButton active={activeTab === "settings"} onClick={() => setActiveTab("settings")} icon={<ShieldCheck size={16} />} label="Governance" />
+                                    </div>
+                                )}
                             </>
                         )}
                     </nav>
@@ -1294,11 +1470,27 @@ function EventManageDashboardInner() {
                 {/* Status + Publish */}
                 <div className="mt-auto p-8 space-y-3">
                     {loading || !event ? (
-                        <div className="h-16 w-full bg-white/5 rounded-2xl animate-pulse" />
+                        <div className="h-16 w-full bg-zinc-900 rounded-2xl animate-pulse" />
                     ) : (
                         <>
+                            {/* Edit Rights Active Badge for Students */}
+                            {isStaffStudent && canStudentEdit && (
+                                <div className="mb-4 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center gap-4 shadow-[0_0_20px_rgba(99,102,241,0.05)]">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                        <ShieldCheck size={18} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-white uppercase tracking-[0.2em] leading-none">Mission Control</p>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Edit Rights Active</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Status Pill */}
-                            <div className="bg-zinc-900/30 p-4 rounded-2xl border border-white/5">
+                            <div className="bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800">
                                 <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-2">Event Status</p>
                                 <div className="flex items-center gap-2">
                                     <div className={cn(
@@ -1332,7 +1524,7 @@ function EventManageDashboardInner() {
                             {(() => {
                                 const status = event.status;
 
-                                // 1. Draft/Revision Phase
+                                // 1. Draft/Revision/Blueprint Phase
                                 if (status === "draft" || status === "revision_required" || status === "changes_requested") {
                                     return (
                                         <button
@@ -1348,7 +1540,7 @@ function EventManageDashboardInner() {
                                         >
                                             {publishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                                             {isStaffStudent
-                                                ? (status === "draft" ? "Notify Faculty for Review" : "Send Revision to Faculty")
+                                                ? "Notify Faculty for Review"
                                                 : "Submit for HOD Approval"
                                             }
                                         </button>
@@ -1377,7 +1569,7 @@ function EventManageDashboardInner() {
                                             </button>
                                             <button
                                                 onClick={() => setShowRevisionModal(true)}
-                                                className="w-full h-11 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all bg-white/5 border border-white/5 hover:bg-white/10 text-white/60 hover:text-white"
+                                                className="w-full h-11 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all bg-zinc-900 border border-zinc-800 hover:bg-white/10 text-white/60 hover:text-white"
                                             >
                                                 <Edit3 size={14} />
                                                 Request Revision
@@ -1445,6 +1637,12 @@ function EventManageDashboardInner() {
                 "flex-1 flex flex-col relative overflow-hidden",
                 isStaffStudent ? "mission-bg bg-zinc-950" : "bg-zinc-950"
             )}>
+                {isTabPastScope && (
+                    <div className="bg-amber-500/10 border-b border-amber-500/20 px-10 py-3 flex items-center justify-center gap-3 sticky top-0 z-[100] backdrop-blur-xl">
+                        <Lock size={14} className="text-amber-500" />
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em]">Viewing Archived Phase Details — READ ONLY MODE</span>
+                    </div>
+                )}
                 {/* Archived Lockdown Banner */}
                 {isArchived && (
                     <div className="bg-rose-950/90 border-b border-rose-500/30 px-10 py-5 flex items-center justify-center gap-5 sticky top-0 z-[100] backdrop-blur-xl group overflow-hidden">
@@ -1482,16 +1680,16 @@ function EventManageDashboardInner() {
 
                 {/* Mission Header (Student Only) */}
                 {isStaffStudent && (
-                    <header className="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-zinc-950/20 backdrop-blur-xl z-50">
+                    <header className="h-20 border-b border-zinc-800 flex items-center justify-between px-10 bg-zinc-950/20 backdrop-blur-xl z-50">
                         <div className="flex items-center gap-6">
                             <button
                                 onClick={() => router.push('/student/feed')}
-                                className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 backdrop-blur-md text-zinc-500 hover:text-white transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]"
+                                className="px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-white/10 backdrop-blur-md text-zinc-500 hover:text-white transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]"
                             >
                                 <ChevronLeft size={14} />
                                 Back to Feed
                             </button>
-                            <div className="h-8 w-px bg-white/5" />
+                            <div className="h-8 w-px bg-zinc-900" />
                             <div className="flex flex-col">
                                 <h1 className="text-xs font-black tracking-tight text-white/90 uppercase italic">
                                     {event?.title} <span className="text-zinc-600 ml-1.5">— Mission Blueprint</span>
@@ -1534,19 +1732,20 @@ function EventManageDashboardInner() {
                         <div className="flex items-center gap-6">
                                 <button
                                     onClick={() => setShowPreview(true)}
-                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-11 px-6 rounded-2xl transition-all border border-white/5 hover:bg-white/10 hover:border-white/10 backdrop-blur-md"
+                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-11 px-6 rounded-2xl transition-all border border-zinc-800 hover:bg-white/10 hover:border-zinc-800 backdrop-blur-md"
                                 >
                                     <Eye size={15} /> Preview
                                 </button>
 
                             <button
-                                disabled={saving || isReadOnly || conflictStatus.type === 'HARD'}
+                                disabled={saving || isEffectiveReadOnly || conflictStatus.type === 'HARD'}
                                 onClick={handleSaveAll}
                                 className={cn(
                                     "h-11 px-8 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-2xl relative overflow-hidden group",
-                                    (isReadOnly || conflictStatus.type === 'HARD')
-                                        ? "bg-zinc-900 border border-white/5 text-zinc-600 cursor-not-allowed"
-                                        : "bg-white text-black hover:bg-zinc-200 active:scale-95"
+                                    (isEffectiveReadOnly || conflictStatus.type === 'HARD')
+                                        ? "bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed"
+                                        : "bg-white text-black hover:bg-zinc-200 active:scale-95",
+                                    isTabPastScope && "hidden"
                                 )}
                             >
                                 {saving ? (
@@ -1560,7 +1759,7 @@ function EventManageDashboardInner() {
                                 )}
                             </button>
 
-                            <div className="h-10 w-px bg-white/5 mx-2" />
+                            <div className="h-10 w-px bg-zinc-900 mx-2" />
 
                             <div className="flex items-center gap-4">
                                 <div className="text-right">
@@ -1577,31 +1776,32 @@ function EventManageDashboardInner() {
 
                 {/* Standard Header (Non-Student) */}
                 {!isStaffStudent && (
-                    <header className="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-zinc-950/50 backdrop-blur-md z-40">
+                    <header className="h-20 border-b border-zinc-800 flex items-center justify-between px-10 bg-zinc-950/50 backdrop-blur-md z-40">
                         <div className="flex items-center gap-4">
                             <h1 className="text-sm font-bold tracking-tight text-white">{event?.title || "Untitled Event"}</h1>
-                            <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] font-bold text-zinc-500 uppercase">ID: {eventId.slice(0, 8)}</span>
+                            <span className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[9px] font-bold text-zinc-500 uppercase">ID: {eventId.slice(0, 8)}</span>
                         </div>
 
                         <div className="flex items-center gap-4">
                                 <button
                                     onClick={() => setShowPreview(true)}
-                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest h-10 px-4 rounded-xl transition-all border border-white/5 hover:bg-white/5"
+                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest h-10 px-4 rounded-xl transition-all border border-zinc-800 hover:bg-zinc-900"
                                 >
                                     <Eye size={16} /> Preview
                                 </button>
                             <button
-                                disabled={saving || isReadOnly || conflictStatus.type === 'HARD'}
+                                disabled={saving || isEffectiveReadOnly || conflictStatus.type === 'HARD'}
                                 onClick={handleSaveAll}
                                 className={cn(
                                     "h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg",
-                                    (isLocked || conflictStatus.type === 'HARD')
-                                        ? "bg-zinc-900 border border-white/5 text-zinc-600 cursor-not-allowed"
-                                        : "bg-white text-black hover:bg-zinc-200"
+                                    (isEffectiveReadOnly || conflictStatus.type === 'HARD')
+                                        ? "bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed"
+                                        : "bg-white text-black hover:bg-zinc-200",
+                                    isTabPastScope && "hidden"
                                 )}
                             >
-                                {saving ? <Loader2 size={14} className="animate-spin" /> : (isReadOnly ? <Shield size={14} /> : (conflictStatus.type === 'HARD' ? <AlertCircle size={14} /> : <Save size={14} />))}
-                                {isReadOnly ? "Governance Locked" : (conflictStatus.type === 'HARD' ? "Conflict Blocked" : "Save Changes")}
+                                {saving ? <Loader2 size={14} className="animate-spin" /> : (isEffectiveReadOnly ? <Shield size={14} /> : (conflictStatus.type === 'HARD' ? <AlertCircle size={14} /> : <Save size={14} />))}
+                                {isEffectiveReadOnly ? "Governance Locked" : (conflictStatus.type === 'HARD' ? "Conflict Blocked" : "Save Changes")}
                             </button>
                         </div>
                     </header>
@@ -1634,7 +1834,7 @@ function EventManageDashboardInner() {
                                         uploadingBanner={uploadingBanner}
                                         onPublish={() => setShowPublishConfirm(true)}
                                         publishing={publishing}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                         isStaffStudent={isStaffStudent}
                                     />
                                 )}
@@ -1649,7 +1849,7 @@ function EventManageDashboardInner() {
                                             const { data } = await supabase.from("events").select("id, title, status, start_time, end_time, registered_count, fest_domain_id, fest_category, club_id").eq("parent_event_id", eventId).order("start_time");
                                             if (data) setSubEventsState(data);
                                         }}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "domains" && event?.event_type === "umbrella" && (
@@ -1661,7 +1861,7 @@ function EventManageDashboardInner() {
                                             const { data } = await supabase.from("fest_domains").select("*").eq("umbrella_event_id", eventId).order("created_at");
                                             if (data) setFestDomains(data);
                                         }}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "rounds" && (
@@ -1670,7 +1870,7 @@ function EventManageDashboardInner() {
                                         onAdd={() => { setEditingRound(null); setIsRoundModalOpen(true); }}
                                         onEdit={(r) => { setEditingRound(r); setIsRoundModalOpen(true); }}
                                         onDelete={handleDeleteRound}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "registration" && event && (
@@ -1678,7 +1878,7 @@ function EventManageDashboardInner() {
                                         event={event}
                                         onSave={handleSaveRegistrationConfig}
                                         saving={saving}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                         updateEvent={updateEvent}
                                         handleRulebookUpload={handleRulebookUpload}
                                         uploadingRulebook={uploadingRulebook}
@@ -1692,7 +1892,7 @@ function EventManageDashboardInner() {
                                         onRoundSelect={setSelectedSubmissionRoundId}
                                         onSaveScore={handleSaveScore}
                                         saving={saving}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "prizes" && (
@@ -1701,9 +1901,10 @@ function EventManageDashboardInner() {
                                         onAdd={() => { setEditingPrize(null); setIsPrizeModalOpen(true); }}
                                         onEdit={(p) => { setEditingPrize(p); setIsPrizeModalOpen(true); }}
                                         onDelete={handleDeletePrize}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                         event={event}
                                         updateEvent={updateEvent}
+                                        isStaffStudent={isStaffStudent}
                                     />
                                 )}
                                 {activeTab === "faqs" && event && (
@@ -1712,7 +1913,7 @@ function EventManageDashboardInner() {
                                         onChange={(faqs: any) => updateEvent({ faqs })}
                                         onSave={handleSaveAll}
                                         saving={saving}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "sponsors" && event && (
@@ -1722,7 +1923,7 @@ function EventManageDashboardInner() {
                                         onChange={(sponsors) => updateEvent({ sponsors })}
                                         onSave={handleSaveAll}
                                         saving={saving}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "reports" && (
@@ -1734,6 +1935,7 @@ function EventManageDashboardInner() {
                                         subEvents={subEventsState}
                                         festDomains={festDomains}
                                         loading={loading}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "results" && event && (
@@ -1744,6 +1946,7 @@ function EventManageDashboardInner() {
                                         onAssignWinner={handleAssignWinner}
                                         onCompleteEvent={handleCompleteEvent}
                                         saving={saving}
+                                        readOnly={isEffectiveReadOnly}
                                     />
                                 )}
                                 {activeTab === "settings" && event && !isStaffStudent && (
@@ -1751,7 +1954,7 @@ function EventManageDashboardInner() {
                                         event={event}
                                         updateEvent={updateEvent}
                                         venues={venues}
-                                        readOnly={isLocked}
+                                        readOnly={isArchived}
                                         onArchive={handleArchiveEvent}
                                         onSave={handleSaveAll}
                                         saving={saving}
@@ -1774,14 +1977,103 @@ function EventManageDashboardInner() {
                                             if (error) alert("Sync Error: " + error.message);
                                             if (data) setEventStaff(data);
                                         }}
-                                        readOnly={isReadOnly}
+                                        readOnly={isEffectiveReadOnly}
                                         institutionId={user?.institution_id}
+                                        isStaffStudent={isStaffStudent}
+                                        isParentHost={isParentHost}
+                                        parentFestName={event.parent?.title}
+                                        currentUserId={user?.dbId}
+                                        showMessage={showMessage}
+                                        eventType={event.event_type}
                                     />
+                                )}
+                                {activeTab === "broadcast" && (
+                                    <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
+                                        <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                                            <Radio size={32} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">Broadcast Center</h3>
+                                            <p className="text-sm text-zinc-500 max-w-md mx-auto mt-1">Send announcements and notifications to all registered students from this dashboard.</p>
+                                        </div>
+                                        <button className="px-6 py-2 rounded-xl bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-400 transition-all">Initialize Comms</button>
+                                    </div>
+                                )}
+                                {activeTab === "scanner" && (
+                                    <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
+                                        <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                                            <QrCode size={32} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">Institutional Scanner</h3>
+                                            <p className="text-sm text-zinc-500 max-w-md mx-auto mt-1">Verify student identities and check-in attendees at the venue using secure QR protocols.</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => router.push(`/faculty/scanner?eventId=${eventId}`)}
+                                            className="px-6 py-2 rounded-xl bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all"
+                                        >
+                                            Launch Scanner Interface
+                                        </button>
+                                    </div>
                                 )}
                             </motion.div>
                         </AnimatePresence>
                     )}
                 </div>
+
+                {/* ── Sticky Navigation Footer ── */}
+                {!loading && event && getTabSequence().includes(activeTab) && (
+                    <div className={cn(
+                        "h-24 bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-900 px-10 flex items-center justify-between z-40 shrink-0 transition-all",
+                        isStaffStudent && "h-28 bg-[#09090b]/90 border-t-white/5"
+                    )}>
+                        <div className="flex items-center gap-4">
+                            {activeTab !== getTabSequence()[0] && (
+                                <button
+                                    onClick={handlePrevious}
+                                    className={cn(
+                                        "h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all flex items-center gap-2 border border-zinc-800 hover:bg-zinc-900",
+                                        isStaffStudent && "h-14 px-8 text-xs bg-zinc-900/50 border-white/5"
+                                    )}
+                                >
+                                    <ArrowLeft size={isStaffStudent ? 16 : 14} /> Previous Section
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            {activeTab !== getTabSequence().slice(-1)[0] ? (
+                                <button
+                                    disabled={saving || publishing}
+                                    onClick={handleSaveAndNext}
+                                    className={cn(
+                                        "h-10 px-8 rounded-xl bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-white/5",
+                                        isStaffStudent && "h-14 px-12 text-xs bg-indigo-500 text-white hover:bg-indigo-400 shadow-indigo-500/30"
+                                    )}
+                                >
+                                    {saving ? <Loader2 size={isStaffStudent ? 18 : 14} className="animate-spin" /> : <Save size={isStaffStudent ? 18 : 14} />}
+                                    {isStaffStudent ? "SAVE & NEXT STEP" : (isEffectiveReadOnly ? "Proceed" : "Save & Proceed")}
+                                    <ArrowRight size={isStaffStudent ? 18 : 14} />
+                                </button>
+                            ) : (
+                                !isEffectiveReadOnly && (
+                                    <button
+                                        disabled={saving || publishing}
+                                        onClick={isStaffStudent ? () => setShowPublishConfirm(true) : handleSaveAll}
+                                        className={cn(
+                                            "h-10 px-8 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-emerald-500/20",
+                                            isStaffStudent && "h-14 px-12 text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400"
+                                        )}
+                                    >
+                                        {saving || publishing ? <Loader2 size={isStaffStudent ? 18 : 14} className="animate-spin" /> : (isStaffStudent ? <Check size={18} /> : <Save size={14} />)}
+                                        {isStaffStudent ? "✅ READY FOR REVIEW" : "Save All Blueprint"}
+                                        {isStaffStudent && <ArrowRight size={18} />}
+                                    </button>
+                                )
+                            )}
+                        </div>
+                    </div>
+                )}
             </main>
 
             {/* Modals & Overlays */}
@@ -1858,7 +2150,7 @@ function EventManageDashboardInner() {
                         <div className="flex gap-3 px-8 pb-8">
                             <button
                                 onClick={() => setShowPublishConfirm(false)}
-                                className="flex-1 h-11 rounded-2xl bg-zinc-900 border border-white/5 text-zinc-400 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
+                                className="flex-1 h-11 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
                             >
                                 Cancel
                             </button>
@@ -1890,7 +2182,7 @@ function EventManageDashboardInner() {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="w-full max-w-xl bg-zinc-950 border border-white/10 rounded-[3rem] p-12 relative overflow-hidden shadow-2xl"
+                            className="w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-[3rem] p-12 relative overflow-hidden shadow-2xl"
                         >
                             <div className="space-y-8 relative z-10">
                                 <div className="space-y-4">
@@ -1912,7 +2204,7 @@ function EventManageDashboardInner() {
                                         value={revisionFeedback}
                                         onChange={(e) => setRevisionFeedback(e.target.value)}
                                         placeholder="e.g., Description is too vague, please add exact venue requirements and update the prize pool details."
-                                        className="w-full h-40 bg-zinc-900 border border-white/5 rounded-3xl px-6 py-5 text-sm font-medium focus:outline-none focus:border-amber-500/50 transition-all resize-none shadow-inner"
+                                        className="w-full h-40 bg-zinc-900 border border-zinc-800 rounded-3xl px-6 py-5 text-sm font-medium focus:outline-none focus:border-amber-500/50 transition-all resize-none shadow-inner"
                                     />
                                 </div>
 
@@ -1963,28 +2255,117 @@ export default function EventManageDashboard() {
 
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
+function AccordionSection({ 
+    title, 
+    isOpen, 
+    onToggle, 
+    isLocked, 
+    isCompleted, 
+    isActive, 
+    children, 
+    badge 
+}: { 
+    title: string; 
+    isOpen: boolean; 
+    onToggle: () => void; 
+    isLocked: boolean; 
+    isCompleted: boolean; 
+    isActive: boolean; 
+    children: React.ReactNode;
+    badge?: string;
+}) {
+    const [stage, description] = title.includes(': ') ? title.split(': ') : [null, title];
+
+    return (
+        <div className="space-y-1">
+            <button
+                onClick={isLocked ? undefined : onToggle}
+                className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all group",
+                    isLocked ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-zinc-900/40"
+                )}
+            >
+                <div className="flex items-center gap-3">
+                    <div className={cn(
+                        "w-4 h-4 rounded-full flex items-center justify-center border transition-all shrink-0",
+                        isCompleted ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                        isActive ? "bg-white border-white text-black shadow-[0_0_12px_rgba(255,255,255,0.3)]" :
+                        isLocked ? "bg-zinc-950 border-zinc-900 text-zinc-800" : "bg-zinc-900 border-zinc-800 text-zinc-600"
+                    )}>
+                        {isCompleted ? <Check size={8} strokeWidth={4} /> : 
+                         isLocked ? <Lock size={8} /> : 
+                         <div className={cn("w-1 h-1 rounded-full", isActive ? "bg-black" : "bg-zinc-700")} />}
+                    </div>
+                    <div className="text-left flex flex-col items-start gap-0.5">
+                        {stage && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 leading-none">
+                                {stage}
+                            </span>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <p className={cn(
+                                "text-[12px] font-semibold uppercase tracking-tight transition-colors leading-tight",
+                                isActive ? "text-white" : "text-zinc-500 group-hover:text-zinc-300"
+                            )}>
+                                {description}
+                            </p>
+                            {badge && (
+                                <span className="text-[6px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20 inline-block">
+                                    {badge}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                {!isLocked && (
+                    <ChevronDown 
+                        size={12} 
+                        className={cn("text-zinc-700 transition-transform duration-300", isOpen ? "rotate-180" : "")} 
+                    />
+                )}
+            </button>
+            
+            <AnimatePresence initial={false}>
+                {isOpen && !isLocked && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                        className="overflow-hidden"
+                    >
+                        <div className="pl-4 border-l border-zinc-800/80 ml-[10.5px] space-y-0.5 mb-1 pt-1 pb-1">
+                            {children}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
 function NavButton({ active, onClick, icon, label, loading }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; loading?: boolean }) {
     return (
         <button
             onClick={onClick}
             className={cn(
-                "w-full flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all font-bold text-[11px] uppercase tracking-widest group relative text-left",
+                "w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all font-medium text-[13px] group relative text-left",
                 active
-                    ? "bg-white/5 text-white shadow-sm border border-white/10"
-                    : "text-zinc-600 hover:text-zinc-400"
+                    ? "bg-zinc-900/80 text-white border border-zinc-800/50"
+                    : "text-zinc-500 hover:text-zinc-200"
             )}
         >
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className={cn("w-5 flex justify-center transition-colors shrink-0", active ? "text-cyan-400" : "group-hover:text-zinc-400")}>
-                    {icon}
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                <div className={cn("w-4 flex justify-center transition-colors shrink-0", active ? "text-white" : "group-hover:text-zinc-300")}>
+                    {React.cloneElement(icon as React.ReactElement<any>, { size: 14 })}
                 </div>
-                <span className="line-clamp-2 leading-tight flex-1">
+                <span className="flex-1 leading-tight">
                     {label}
                 </span>
             </div>
             {active && (
-                <div className="ml-3 shrink-0 flex items-center justify-center w-2">
-                    <motion.div layoutId="nav-dot" className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                <div className="ml-2 shrink-0 flex items-center justify-center">
+                    <motion.div layoutId="nav-dot" className="w-1 h-1 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]" />
                 </div>
             )}
         </button>
@@ -2057,7 +2438,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                                 </div>
                             </div>
 
-                            <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl p-5 border border-white/5 relative group">
+                            <div className="bg-zinc-900 backdrop-blur-md rounded-2xl p-5 border border-zinc-800 relative group">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 rounded-full" />
                                 <p className="text-sm font-medium text-white/90 italic leading-relaxed pl-4">
                                     "{event.governance_note || event.rejection_reason || "No feedback provided."}"
@@ -2066,9 +2447,9 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                         </div>
 
                         {((event.status === "revision_required" && isStaffStudent) || (event.status === "changes_requested")) && (
-                            <div className="lg:w-80 w-full space-y-6 bg-zinc-950/40 p-6 rounded-2xl border border-white/5 shadow-inner">
+                            <div className="lg:w-80 w-full space-y-6 bg-zinc-950/40 p-6 rounded-2xl border border-zinc-800 shadow-inner">
                                 <div className="space-y-3">
-                                    <label className="flex items-center justify-between group cursor-pointer p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-amber-500/30 transition-all">
+                                    <label className="flex items-center justify-between group cursor-pointer p-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/30 transition-all">
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 group-hover:text-white transition-colors">Acknowledge Feedback</span>
                                             <span className="text-[9px] text-zinc-500 font-bold uppercase">Feedback read & understood</span>
@@ -2084,7 +2465,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                                         </div>
                                     </label>
 
-                                    <label className="flex items-center justify-between group cursor-pointer p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-amber-500/30 transition-all">
+                                    <label className="flex items-center justify-between group cursor-pointer p-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/30 transition-all">
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 group-hover:text-white transition-colors">Verify Accuracy</span>
                                             <span className="text-[9px] text-zinc-500 font-bold uppercase">Blueprint is ready</span>
@@ -2124,7 +2505,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                         disabled={readOnly}
                         value={event.title}
                         onChange={e => updateEvent({ title: e.target.value })}
-                        className="w-full bg-zinc-950 border border-white/5 rounded-2xl px-6 py-5 text-sm font-bold focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner placeholder:opacity-20 disabled:opacity-50"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-5 text-sm font-bold focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner placeholder:opacity-20 disabled:opacity-50"
                     />
                 </div>
                 <div className="space-y-3">
@@ -2133,7 +2514,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                         disabled={readOnly}
                         value={event.club_id || "none"}
                         onChange={e => updateEvent({ club_id: e.target.value })}
-                        className="w-full bg-zinc-950 border border-white/5 rounded-2xl px-6 py-5 text-sm font-bold appearance-none focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-5 text-sm font-bold appearance-none focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
                     >
                         <option value="none">DEPARTMENTAL CORE / NONE</option>
                         {clubs.map((c: any) => <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>)}
@@ -2154,10 +2535,10 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                                 "p-6 rounded-3xl border text-left transition-all space-y-4 relative overflow-hidden group/card",
                                 event.is_competition !== false
                                     ? "bg-cyan-500/5 border-cyan-500/30 ring-1 ring-cyan-500/20"
-                                    : "bg-zinc-950 border-white/5 opacity-40 hover:opacity-80 disabled:opacity-30"
+                                    : "bg-zinc-950 border-zinc-800 opacity-40 hover:opacity-80 disabled:opacity-30"
                             )}
                         >
-                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg", event.is_competition !== false ? "bg-cyan-500 text-black" : "bg-white/5 text-zinc-600")}>
+                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg", event.is_competition !== false ? "bg-cyan-500 text-black" : "bg-zinc-900 text-zinc-600")}>
                                 <Trophy size={24} />
                             </div>
                             <div>
@@ -2175,10 +2556,10 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                                 "p-6 rounded-3xl border text-left transition-all space-y-4 relative overflow-hidden group/card",
                                 event.is_competition === false
                                     ? "bg-amber-500/5 border-amber-500/30 ring-1 ring-amber-500/20"
-                                    : "bg-zinc-950 border-white/5 opacity-40 hover:opacity-80 disabled:opacity-30"
+                                    : "bg-zinc-950 border-zinc-800 opacity-40 hover:opacity-80 disabled:opacity-30"
                             )}
                         >
-                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg", event.is_competition === false ? "bg-amber-500 text-black" : "bg-white/5 text-zinc-600")}>
+                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg", event.is_competition === false ? "bg-amber-500 text-black" : "bg-zinc-900 text-zinc-600")}>
                                 <Ticket size={24} />
                             </div>
                             <div>
@@ -2200,7 +2581,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                     disabled={readOnly}
                     value={event.description}
                     onChange={e => updateEvent({ description: e.target.value })}
-                    className="w-full bg-zinc-950 border border-white/5 rounded-2xl px-6 py-5 text-sm font-medium focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner disabled:opacity-50"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-5 text-sm font-medium focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner disabled:opacity-50"
                 />
             </div>
 
@@ -2215,7 +2596,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                         onClick={() => !readOnly && !uploadingBanner && document.getElementById('banner-file')?.click()}
                         className={cn(
                             "md:col-span-2 aspect-video border border-zinc-800 rounded-xl flex flex-col items-center justify-center gap-4 group transition-all overflow-hidden relative shadow-2xl bg-zinc-950",
-                            dragActive ? "border-indigo-500 bg-indigo-500/5" : "hover:border-white/10",
+                            dragActive ? "border-indigo-500 bg-indigo-500/5" : "hover:border-zinc-800",
                             (readOnly || uploadingBanner) ? "cursor-not-allowed opacity-50" : "cursor-pointer"
                         )}
                     >
@@ -2228,7 +2609,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                             <img src={event.banner_url} className="w-full h-full object-cover rounded-xl" alt="Banner Preview" />
                         ) : (
                             <div className="text-center">
-                                <div className="w-16 h-16 rounded-[2rem] bg-zinc-900 flex items-center justify-center text-zinc-700 group-hover:text-indigo-500 transition-all mx-auto mb-4 border border-white/5 shadow-inner">
+                                <div className="w-16 h-16 rounded-[2rem] bg-zinc-900 flex items-center justify-center text-zinc-700 group-hover:text-indigo-500 transition-all mx-auto mb-4 border border-zinc-800 shadow-inner">
                                     <ImageIcon size={32} />
                                 </div>
                                 <p className="text-[10px] font-black font-sans text-zinc-500 uppercase tracking-[0.3em]">
@@ -2240,7 +2621,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                             if (e.target.files?.[0]) handleBannerUpload(e.target.files[0]);
                         }} />}
                     </div>
-                    <div className="bg-zinc-950 border border-white/5 rounded-[2.5rem] p-8 flex flex-col justify-center gap-4">
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col justify-center gap-4">
                         <div className="space-y-4">
                             <div className="flex items-center gap-3 text-zinc-500">
                                 <LinkIcon size={16} />
@@ -2252,7 +2633,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                                 placeholder="https://..."
                                 value={event.banner_url || ""}
                                 onChange={e => updateEvent({ banner_url: e.target.value })}
-                                className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-[10px] font-bold text-zinc-400 focus:outline-none disabled:opacity-50"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-[10px] font-bold text-zinc-400 focus:outline-none disabled:opacity-50"
                             />
                         </div>
                     </div>
@@ -2263,7 +2644,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                 <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] block ml-2">
                     Detailed Description <span className="text-rose-500 normal-case font-medium ml-2">(Required for Approval)</span>
                 </label>
-                <div className={cn("bg-zinc-950 border border-white/5 rounded-[3.5rem] overflow-hidden shadow-2xl transition-all", !readOnly && "focus-within:border-cyan-500/20", readOnly && "opacity-50 pointer-events-none")}>
+                <div className={cn("bg-zinc-950 border border-zinc-800 rounded-[3.5rem] overflow-hidden shadow-2xl transition-all", !readOnly && "focus-within:border-cyan-500/20", readOnly && "opacity-50 pointer-events-none")}>
                     <div className="quill-container">
                         <ReactQuill
                             theme="snow"
@@ -2312,13 +2693,13 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                 </div>
 
                 {(event.resource_links || []).length === 0 ? (
-                    <div className="border-2 border-dashed border-white/5 rounded-2xl h-24 flex items-center justify-center text-zinc-700 text-xs font-bold">
+                    <div className="border-2 border-dashed border-zinc-800 rounded-2xl h-24 flex items-center justify-center text-zinc-700 text-xs font-bold">
                         No resource links yet
                     </div>
                 ) : (
                     <div className="space-y-3">
                         {(event.resource_links || []).map((link: ResourceLink, idx: number) => (
-                            <div key={link.id} className="flex items-center gap-3 bg-zinc-950 border border-white/5 rounded-2xl px-4 py-3">
+                            <div key={link.id} className="flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3">
                                 <select
                                     value={link.icon}
                                     onChange={e => {
@@ -2326,7 +2707,7 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                                         updated[idx] = { ...updated[idx], icon: e.target.value as ResourceLink["icon"] };
                                         updateEvent({ resource_links: updated });
                                     }}
-                                    className="bg-zinc-900 border border-white/5 rounded-xl px-3 py-2 text-[10px] font-bold text-zinc-400 focus:outline-none shrink-0"
+                                    className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-[10px] font-bold text-zinc-400 focus:outline-none shrink-0"
                                 >
                                     <option value="whatsapp">📱 WhatsApp</option>
                                     <option value="discord">💬 Discord</option>
@@ -2371,18 +2752,6 @@ function OverviewTab({ event, updateEvent, clubs, handleBannerUpload, onSave, sa
                 )}
             </section>
 
-            {!readOnly && (
-                <div className="flex justify-end pt-10 border-t border-white/5">
-                    <button
-                        disabled={saving}
-                        onClick={onSave}
-                        className="bg-white text-black h-14 px-12 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-3 hover:bg-zinc-200 transition-all shadow-xl disabled:opacity-50"
-                    >
-                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save Changes
-                    </button>
-                </div>
-            )}
 
             <style jsx global>{`
                 .quill-container .ql-toolbar.ql-snow {
@@ -2447,7 +2816,7 @@ function RoundsTab({ rounds, onAdd, onEdit, onDelete, readOnly }: {
     return (
         <div className="space-y-8 pb-10">
             {/* Header */}
-            <header className="flex items-center justify-between p-8 bg-zinc-950 border border-white/5 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+            <header className="flex items-center justify-between p-8 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
                 <div className="flex items-center gap-5 relative z-10">
                     <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                         <Layers size={24} />
@@ -2504,7 +2873,7 @@ function RoundsTab({ rounds, onAdd, onEdit, onDelete, readOnly }: {
                                                         {TYPE_LABELS[round.type] ?? round.type}
                                                     </span>
                                                     {round.phase && (
-                                                        <span className="inline-flex items-center px-3 py-1 rounded-full border border-white/10 bg-white/5 text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                                                        <span className="inline-flex items-center px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900 text-[9px] font-black uppercase tracking-widest text-zinc-500">
                                                             PHASE: {round.phase}
                                                         </span>
                                                     )}
@@ -2532,7 +2901,7 @@ function RoundsTab({ rounds, onAdd, onEdit, onDelete, readOnly }: {
                                             <div className="flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
                                                 <button
                                                     onClick={() => onEdit(round)}
-                                                    className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all"
+                                                    className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white transition-all"
                                                 >
                                                     <Edit3 size={14} />
                                                 </button>
@@ -2556,9 +2925,9 @@ function RoundsTab({ rounds, onAdd, onEdit, onDelete, readOnly }: {
             {!readOnly && (
                 <button
                     onClick={onAdd}
-                    className="w-full h-24 border-2 border-dashed border-white/10 rounded-[2rem] flex items-center justify-center gap-4 text-zinc-500 hover:text-white hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group"
+                    className="w-full h-24 border-2 border-dashed border-zinc-800 rounded-[2rem] flex items-center justify-center gap-4 text-zinc-500 hover:text-white hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group"
                 >
-                    <div className="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-indigo-500/10 border border-white/10 group-hover:border-indigo-500/30 flex items-center justify-center transition-all">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-900 group-hover:bg-indigo-500/10 border border-zinc-800 group-hover:border-indigo-500/30 flex items-center justify-center transition-all">
                         <Plus size={18} className="group-hover:text-indigo-400 transition-colors" />
                     </div>
                     <span className="text-xs font-black uppercase tracking-[0.2em]">
@@ -2648,7 +3017,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                 className="w-full max-w-lg bg-zinc-950 border border-white/8 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-8 pt-8 pb-6 border-b border-white/5 flex-shrink-0">
+                <div className="flex items-center justify-between px-8 pt-8 pb-6 border-b border-zinc-800 flex-shrink-0">
                     <div>
                         <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-1">Rounds & Schedule</p>
                         <h3 className="text-lg font-black text-white tracking-tight">
@@ -2657,7 +3026,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all transition-colors"
+                        className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white transition-all transition-colors"
                     >
                         <X size={16} />
                     </button>
@@ -2669,7 +3038,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Phase / Label</label>
                         <div className="relative">
                             <select
-                                className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white appearance-none focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4 text-sm font-bold text-white appearance-none focus:outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
                                 value={formData.phase ?? ""}
                                 onChange={e => setFormData({ ...formData, phase: e.target.value })}
                             >
@@ -2687,7 +3056,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Round Title</label>
                         <input
-                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-5 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all placeholder:text-zinc-700"
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all placeholder:text-zinc-700"
                             value={formData.title ?? ""}
                             onChange={e => setFormData({ ...formData, title: e.target.value })}
                             placeholder="e.g. Stage 1: The First Step"
@@ -2707,13 +3076,13 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                                         "flex flex-col gap-2 p-4 rounded-2xl border text-left transition-all relative overflow-hidden group",
                                         formData.type === value
                                             ? "bg-indigo-500 border-indigo-500/50 shadow-lg shadow-indigo-500/20"
-                                            : "bg-zinc-900 border-white/5 hover:border-zinc-700"
+                                            : "bg-zinc-900 border-zinc-800 hover:border-zinc-700"
                                     )}
                                 >
                                     <div className="flex items-center justify-between relative z-10 w-full">
                                         <div className={cn(
                                             "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
-                                            formData.type === value ? "bg-white text-indigo-500 shadow-xl" : "bg-white/5 text-zinc-500 group-hover:bg-white/10"
+                                            formData.type === value ? "bg-white text-indigo-500 shadow-xl" : "bg-zinc-900 text-zinc-500 group-hover:bg-white/10"
                                         )}>
                                             {icon}
                                         </div>
@@ -2768,7 +3137,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                         </div>
 
                         {!formData.requires_submission && (
-                            <div className="mt-4 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5">
+                            <div className="mt-4 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
                                 <div className="w-4 h-4 rounded-full bg-zinc-700/60 flex items-center justify-center shrink-0 mt-0.5">
                                     <span className="text-[8px] text-zinc-400 font-black">i</span>
                                 </div>
@@ -2795,7 +3164,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                             <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Start Time</label>
                             <input
                                 type="datetime-local"
-                                className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all [color-scheme:dark]"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all [color-scheme:dark]"
                                 value={formData.start_time ?? ""}
                                 onChange={e => setFormData({ ...formData, start_time: e.target.value })}
                             />
@@ -2804,7 +3173,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                             <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">End Time</label>
                             <input
                                 type="datetime-local"
-                                className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all [color-scheme:dark]"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4 text-xs font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all [color-scheme:dark]"
                                 value={formData.end_time ?? ""}
                                 onChange={e => setFormData({ ...formData, end_time: e.target.value })}
                             />
@@ -2815,7 +3184,7 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Description <span className="text-zinc-700 normal-case font-medium">(optional)</span></label>
                         <textarea
-                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-5 py-4 text-sm font-medium text-zinc-300 focus:outline-none focus:border-indigo-500/50 transition-all min-h-[100px] resize-none placeholder:text-zinc-700"
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4 text-sm font-medium text-zinc-300 focus:outline-none focus:border-indigo-500/50 transition-all min-h-[100px] resize-none placeholder:text-zinc-700"
                             value={formData.description ?? ""}
                             onChange={e => setFormData({ ...formData, description: e.target.value })}
                             placeholder="Describe the format, rules, or evaluation criteria for this round..."
@@ -2824,10 +3193,10 @@ function RoundModal({ isOpen, onClose, onSave, initialData, saving, readOnly }: 
                 </div>
 
                 {/* Footer */}
-                <div className="flex gap-3 px-8 pb-8 pt-4 border-t border-white/5 flex-shrink-0">
+                <div className="flex gap-3 px-8 pb-8 pt-4 border-t border-zinc-800 flex-shrink-0">
                     <button
                         onClick={onClose}
-                        className="flex-1 h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-zinc-900 text-zinc-400 border border-white/5 hover:text-white transition-all shadow-lg"
+                        className="flex-1 h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white transition-all shadow-lg"
                     >
                         Cancel
                     </button>
@@ -2891,14 +3260,14 @@ function ToggleRow({
             layout
             className={cn(
                 "p-7 bg-zinc-950 border rounded-[2rem] transition-colors duration-200",
-                enabled ? "border-indigo-500/30 shadow-lg shadow-indigo-500/5" : "border-white/5"
+                enabled ? "border-indigo-500/30 shadow-lg shadow-indigo-500/5" : "border-zinc-800"
             )}
         >
             <div className="flex items-center justify-between gap-6">
                 <div className="flex items-center gap-5">
                     <div className={cn(
                         "w-11 h-11 rounded-xl flex items-center justify-center transition-colors duration-200",
-                        enabled ? "bg-indigo-500/15 text-indigo-400" : "bg-white/5 text-zinc-600"
+                        enabled ? "bg-indigo-500/15 text-indigo-400" : "bg-zinc-900 text-zinc-600"
                     )}>
                         {icon}
                     </div>
@@ -2914,7 +3283,7 @@ function ToggleRow({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mt-6 pt-6 border-t border-white/5"
+                    className="mt-6 pt-6 border-t border-zinc-800"
                 >
                     {children}
                 </motion.div>
@@ -2959,8 +3328,11 @@ function RegistrationTab({
         if (event.registration_config) setConfig(event.registration_config);
     }, [event.registration_config]);
 
-    const update = (patch: Partial<RegistrationConfig>) =>
-        setConfig((prev) => ({ ...prev, ...patch }));
+    const update = (patch: Partial<RegistrationConfig>) => {
+        const newConfig = { ...config, ...patch };
+        setConfig(newConfig);
+        updateEvent({ registration_config: newConfig });
+    };
 
     const hasChanges =
         JSON.stringify(config) !== JSON.stringify(event.registration_config ?? defaultConfig);
@@ -2968,7 +3340,7 @@ function RegistrationTab({
     return (
         <div className="space-y-8 pb-10">
             {/* Header */}
-            <header className="flex items-start justify-between p-8 bg-zinc-950 border border-white/5 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+            <header className="flex items-start justify-between p-8 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
                 <div className="flex items-center gap-5 relative z-10">
                     <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                         <ClipboardCheck size={24} />
@@ -2986,7 +3358,7 @@ function RegistrationTab({
                 <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.25em] mb-4 ml-1">Always Collected</p>
                 <div className="grid grid-cols-3 gap-3">
                     {["Full Name", "Email Address", "Phone Number"].map((field) => (
-                        <div key={field} className="flex items-center gap-3 px-5 py-4 bg-zinc-900/40 border border-white/5 rounded-2xl">
+                        <div key={field} className="flex items-center gap-3 px-5 py-4 bg-zinc-900/40 border border-zinc-800 rounded-2xl">
                             <Check size={14} className="text-emerald-500 shrink-0" />
                             <span className="text-xs font-semibold text-zinc-400">{field}</span>
                         </div>
@@ -3039,12 +3411,12 @@ function RegistrationTab({
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => update({ team_min_size: Math.max(1, config.team_min_size - 1) })}
-                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
+                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
                                 >−</button>
                                 <span className="text-xl font-black text-white w-8 text-center">{config.team_min_size}</span>
                                 <button
                                     onClick={() => update({ team_min_size: Math.min(config.team_max_size, config.team_min_size + 1) })}
-                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
+                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
                                 >+</button>
                             </div>
                         </div>
@@ -3053,12 +3425,12 @@ function RegistrationTab({
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => update({ team_max_size: Math.max(config.team_min_size, config.team_max_size - 1) })}
-                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
+                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
                                 >−</button>
                                 <span className="text-xl font-black text-white w-8 text-center">{config.team_max_size}</span>
                                 <button
                                     onClick={() => update({ team_max_size: config.team_max_size + 1 })}
-                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
+                                    className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-all font-bold text-lg"
                                 >+</button>
                             </div>
                         </div>
@@ -3069,153 +3441,217 @@ function RegistrationTab({
                 </ToggleRow>
             </div>
 
-            {/* Participation Tracks */}
-            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.25em] ml-1 pt-4">Event Architecture</p>
-            <ToggleRow
-                icon={<Layers size={18} />}
-                label="Participation Tracks / Categories"
-                description="Allow students to choose from specific tracks (e.g. Solo vs Group, Different Instruments)."
-                enabled={(event.participation_tracks?.length ?? 0) > 0}
-                onChange={(enabled) => {
-                    updateEvent({ participation_tracks: enabled ? [{ id: crypto.randomUUID(), name: "Main Track", is_team: false }] : [] });
-                }}
-            >
-                <div className="space-y-4">
-                    <div className="space-y-3">
-                        {event.participation_tracks?.map((track, idx) => (
-                            <div key={track.id} className="flex items-center gap-3 group/track animate-in fade-in slide-in-from-left-2 transition-all">
-                                <div className="flex-1 relative">
-                                    <input
-                                        className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-xs font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all"
-                                        value={track.name}
-                                        onChange={(e) => {
-                                            const newTracks = [...(event.participation_tracks || [])];
-                                            newTracks[idx] = { ...newTracks[idx], name: e.target.value };
-                                            updateEvent({ participation_tracks: newTracks });
-                                        }}
-                                        placeholder="Track Name (e.g. Solo Western Dance)"
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        const newTracks = [...(event.participation_tracks || [])];
-                                        newTracks[idx] = { ...newTracks[idx], is_team: !newTracks[idx].is_team };
-                                        updateEvent({ participation_tracks: newTracks });
-                                    }}
-                                    className={cn(
-                                        "h-10 px-4 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                                        track.is_team ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" : "bg-zinc-900 border-white/5 text-zinc-500 hover:border-white/10"
-                                    )}
-                                >
-                                    {track.is_team ? <Users size={12} /> : <User size={12} />}
-                                    {track.is_team ? "Team Required" : "Individual"}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const newTracks = (event.participation_tracks || []).filter((_, i) => i !== idx);
-                                        updateEvent({ participation_tracks: newTracks });
-                                    }}
-                                    className="w-10 h-10 rounded-xl bg-rose-500/5 border border-rose-500/10 flex items-center justify-center text-rose-500 opacity-0 group-hover/track:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
+            {/* Participation Tracks - HIDE for Umbrella Events */}
+            {event.event_type !== 'umbrella' && (
+                <div className="space-y-4 pt-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.25em] ml-1">Track Manager</p>
+                        <div className="group relative">
+                            <Info size={14} className="text-zinc-500 cursor-help hover:text-indigo-400 transition-colors" />
+                            <div className="absolute right-0 bottom-full mb-3 w-64 p-4 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform translate-y-2 group-hover:translate-y-0">
+                                <p className="text-[10px] font-bold text-white leading-relaxed">
+                                    Students will choose <span className="text-indigo-400">ONE</span> of these tracks during registration. Use this for events like Dance (Solo vs Group) or Music (Vocals vs Instrumental).
+                                </p>
                             </div>
-                        ))}
+                        </div>
                     </div>
-                    <button
-                        onClick={() => {
-                            updateEvent({
-                                participation_tracks: [
-                                    ...(event.participation_tracks || []),
-                                    { id: crypto.randomUUID(), name: "", is_team: false }
-                                ]
-                            });
+
+                    <ToggleRow
+                        icon={<Layers size={18} />}
+                        label="Participation Tracks / Categories"
+                        description="Allow students to choose from specific tracks (e.g. Solo vs Group)."
+                        enabled={(event.participation_tracks?.length ?? 0) > 0}
+                        onChange={(enabled) => {
+                            updateEvent({ participation_tracks: enabled ? [{ id: crypto.randomUUID(), name: "Main Track", is_team: false }] : [] });
                         }}
-                        className="w-full h-10 border border-dashed border-white/10 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all"
                     >
-                        <Plus size={14} /> Add Pattern / Track
-                    </button>
-                </div>
-            </ToggleRow>
-
-            {/* Rulebook Upload */}
-            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.25em] ml-1 pt-4">Governance Documents</p>
-            <div className="p-7 bg-zinc-950 border border-white/5 rounded-[2rem]">
-                <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-5">
-                        <div className="w-11 h-11 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center">
-                            <ScrollText size={18} />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-white">Official Rulebook (PDF)</p>
-                            <p className="text-[10px] font-medium text-zinc-500 mt-0.5">Upload the detailed rulebook, scoring criteria, and guidelines.</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {event.rulebook_url && (
+                        <div className="space-y-6">
+                            {/* Quick Presets */}
                             <div className="flex items-center gap-2">
-                                <a
-                                    href={event.rulebook_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="h-10 px-4 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-all bg-white/5 rounded-xl border border-white/5"
-                                >
-                                    <Eye size={14} /> View Current
-                                </a>
                                 <button
                                     onClick={() => {
-                                        if (confirm("Remove rulebook from mission?")) {
-                                            updateEvent({ rulebook_url: null });
-                                        }
+                                        updateEvent({
+                                            participation_tracks: [
+                                                ...(event.participation_tracks || []),
+                                                { id: crypto.randomUUID(), name: "Solo Track", is_team: false }
+                                            ]
+                                        });
                                     }}
-                                    className="h-10 w-10 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all bg-rose-500/5 rounded-xl border border-rose-500/10"
-                                    title="Remove Rulebook"
+                                    className="flex-1 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all flex items-center justify-center gap-2"
                                 >
-                                    <Trash2 size={16} />
+                                    <User size={12} /> Add Solo
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        updateEvent({
+                                            participation_tracks: [
+                                                ...(event.participation_tracks || []),
+                                                { id: crypto.randomUUID(), name: "Team Track", is_team: true }
+                                            ]
+                                        });
+                                    }}
+                                    className="flex-1 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Users size={12} /> Add Team
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        updateEvent({
+                                            participation_tracks: [
+                                                ...(event.participation_tracks || []),
+                                                { id: crypto.randomUUID(), name: "Duet Track", is_team: true }
+                                            ]
+                                        });
+                                    }}
+                                    className="flex-1 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Users size={12} /> Add Duet
                                 </button>
                             </div>
-                        )}
-                        <label className={cn(
-                            "h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all cursor-pointer shadow-lg",
-                            uploadingRulebook ? "bg-zinc-800 text-zinc-500" : "bg-white text-black hover:bg-zinc-200"
-                        )}>
-                            {uploadingRulebook ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-                            {uploadingRulebook ? "Uploading..." : event.rulebook_url ? "Update PDF" : "Upload Rulebook"}
-                            <input
-                                type="file"
-                                className="hidden"
-                                accept="application/pdf"
-                                onChange={(e) => e.target.files?.[0] && handleRulebookUpload(e.target.files[0])}
-                                disabled={uploadingRulebook}
-                            />
-                        </label>
-                    </div>
-                </div>
-            </div>
 
-            {/* Save Button */}
-            <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                <p className="text-[10px] font-medium text-zinc-600">
-                    {hasChanges || (JSON.stringify(event.participation_tracks) !== JSON.stringify(event.participation_tracks || [])) ? (
-                        <span className="text-amber-400 font-bold">● Unsaved changes</span>
-                    ) : (
-                        <span className="text-emerald-500 font-bold">✓ Settings are up to date</span>
-                    )}
-                </p>
-                <button
-                    disabled={saving || (!hasChanges && JSON.stringify(event.participation_tracks) === JSON.stringify(event.participation_tracks || []))}
-                    onClick={() => onSave(config)}
-                    className="bg-indigo-500 text-white h-12 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-400 transition-all shadow-xl shadow-indigo-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                    {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                    Save Registration Settings
-                </button>
-            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {event.participation_tracks?.map((track, idx) => (
+                                    <div key={track.id} className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl group/track animate-in fade-in zoom-in-95 duration-200 transition-all hover:border-zinc-800 relative">
+                                        <div className="flex items-start justify-between gap-4 mb-4">
+                                            <div className={cn(
+                                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                                                track.is_team ? "bg-emerald-500/10 text-emerald-500" : "bg-indigo-500/10 text-indigo-500"
+                                            )}>
+                                                {track.is_team ? <Users size={18} /> : <User size={18} />}
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const newTracks = (event.participation_tracks || []).filter((_, i) => i !== idx);
+                                                    updateEvent({ participation_tracks: newTracks });
+                                                }}
+                                                className="w-8 h-8 rounded-lg bg-rose-500/5 flex items-center justify-center text-rose-500 opacity-0 group-hover/track:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            <input
+                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all"
+                                                value={track.name}
+                                                onChange={(e) => {
+                                                    const newTracks = [...(event.participation_tracks || [])];
+                                                    newTracks[idx] = { ...newTracks[idx], name: e.target.value };
+                                                    updateEvent({ participation_tracks: newTracks });
+                                                }}
+                                                placeholder="Track Name..."
+                                            />
+                                            <div className="flex items-center justify-between">
+                                                <button
+                                                    onClick={() => {
+                                                        const newTracks = [...(event.participation_tracks || [])];
+                                                        newTracks[idx] = { ...newTracks[idx], is_team: !newTracks[idx].is_team };
+                                                        updateEvent({ participation_tracks: newTracks });
+                                                    }}
+                                                    className={cn(
+                                                        "text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md transition-all",
+                                                        track.is_team ? "bg-emerald-500/20 text-emerald-400" : "bg-indigo-500/20 text-indigo-400"
+                                                    )}
+                                                >
+                                                    {track.is_team ? "Team Participation" : "Solo Entry"}
+                                                </button>
+                                                <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest italic">Track #{idx + 1}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {(!event.participation_tracks || event.participation_tracks.length === 0) && (
+                                <div className="py-8 text-center border-2 border-dashed border-zinc-800 rounded-3xl">
+                                    <Sparkles size={24} className="mx-auto text-zinc-800 mb-3" />
+                                    <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">No tracks configured yet.</p>
+                                </div>
+                            )}
+                            
+                            <button
+                                onClick={() => {
+                                    updateEvent({
+                                        participation_tracks: [
+                                            ...(event.participation_tracks || []),
+                                            { id: crypto.randomUUID(), name: "", is_team: false }
+                                        ]
+                                    });
+                                }}
+                                className="w-full h-12 border border-dashed border-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all"
+                            >
+                                <Plus size={14} /> New Custom Track
+                            </button>
+                        </div>
+                    </ToggleRow>
+                </div>
+            )}
+
+
+            {/* Rulebook Upload - HIDE for Umbrella Events */}
+            {event.event_type !== 'umbrella' && (
+                <>
+                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.25em] ml-1 pt-4">Governance Documents</p>
+                    <div className="p-7 bg-zinc-950 border border-zinc-800 rounded-[2rem]">
+                        <div className="flex items-center justify-between gap-6">
+                            <div className="flex items-center gap-5">
+                                <div className="w-11 h-11 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center">
+                                    <ScrollText size={18} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-white">Official Rulebook (PDF)</p>
+                                    <p className="text-[10px] font-medium text-zinc-500 mt-0.5">Upload the detailed rulebook, scoring criteria, and guidelines.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {event.rulebook_url && (
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={event.rulebook_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="h-10 px-4 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-all bg-zinc-900 rounded-xl border border-zinc-800"
+                                        >
+                                            <Eye size={14} /> View Current
+                                        </a>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm("Remove rulebook from mission?")) {
+                                                    updateEvent({ rulebook_url: null });
+                                                }
+                                            }}
+                                            className="h-10 w-10 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all bg-rose-500/5 rounded-xl border border-rose-500/10"
+                                            title="Remove Rulebook"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                )}
+                                <label className={cn(
+                                    "h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all cursor-pointer shadow-lg",
+                                    uploadingRulebook ? "bg-zinc-800 text-zinc-500" : "bg-white text-black hover:bg-zinc-200"
+                                )}>
+                                    {uploadingRulebook ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+                                    {uploadingRulebook ? "Uploading..." : event.rulebook_url ? "Update PDF" : "Upload Rulebook"}
+                                    <input
+                                        type="file"
+                                        className="hidden"
+                                        accept="application/pdf"
+                                        onChange={(e) => e.target.files?.[0] && handleRulebookUpload(e.target.files[0])}
+                                        disabled={uploadingRulebook}
+                                    />
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
         </div>
     );
 }
 
-function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEvent }: {
+function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEvent, isStaffStudent }: {
     prizes: Prize[];
     onAdd: () => void;
     onEdit: (p: Prize) => void;
@@ -3223,6 +3659,7 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
     readOnly?: boolean;
     event?: any;
     updateEvent?: (patch: any) => void;
+    isStaffStudent?: boolean;
 }) {
     const isUmbrella = event?.event_type === 'umbrella';
     const totalCash = prizes.reduce((acc, p) => acc + (Number(p.value) || 0), 0);
@@ -3245,7 +3682,7 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
     return (
         <div className="space-y-8 pb-10">
             {/* Header banner */}
-            <header className="flex flex-col gap-8 p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+            <header className="flex flex-col gap-8 p-10 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
                 <div className="flex items-center justify-between relative z-10">
                     <div className="flex items-center gap-6">
                         <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
@@ -3282,26 +3719,28 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
                 </div>
 
                 {isUmbrella && (
-                    <div className="relative z-10 pt-8 border-t border-white/5">
+                    <div className="relative z-10 pt-8 border-t border-zinc-800">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="space-y-4 max-w-sm">
-                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] block ml-1">Overall Prize Pool Value</label>
-                                <div className="relative">
-                                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-zinc-700">₹</span>
-                                    <input
-                                        type="number"
-                                        disabled={readOnly}
-                                        value={event?.budget_required || 0}
-                                        onChange={e => updateEvent?.({ budget_required: Number(e.target.value) })}
-                                        className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl pl-12 pr-6 py-5 text-xl font-black text-white focus:outline-none focus:border-amber-500/30 transition-all"
-                                        placeholder="5,00,000"
-                                    />
+                            {!isStaffStudent && (
+                                <div className="space-y-4 max-w-sm">
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] block ml-1">Overall Prize Pool Value</label>
+                                    <div className="relative">
+                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-zinc-700">₹</span>
+                                        <input
+                                            type="number"
+                                            disabled={readOnly}
+                                            value={event?.budget_required || 0}
+                                            onChange={e => updateEvent?.({ budget_required: Number(e.target.value) })}
+                                            className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl pl-12 pr-6 py-5 text-xl font-black text-white focus:outline-none focus:border-amber-500/30 transition-all"
+                                            placeholder="5,00,000"
+                                        />
+                                    </div>
+                                    <p className="text-[9px] text-zinc-600 ml-1 italic leading-relaxed">This total amount will be highlighted prominently on the main Fest Hub discovery page to drive registrations.</p>
                                 </div>
-                                <p className="text-[9px] text-zinc-600 ml-1 italic leading-relaxed">This total amount will be highlighted prominently on the main Fest Hub discovery page to drive registrations.</p>
-                            </div>
+                            )}
 
                             {totalCash > 0 && (
-                                <div className="p-6 bg-white/5 border border-white/5 rounded-3xl text-right">
+                                <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-3xl text-right ml-auto">
                                     <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Calculated Item Total</p>
                                     <p className="text-3xl font-black text-white tracking-tight">₹{totalCash.toLocaleString('en-IN')}</p>
                                 </div>
@@ -3311,7 +3750,7 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
                 )}
 
                 {!isUmbrella && totalCash > 0 && (
-                    <div className="p-6 bg-white/5 border border-white/5 rounded-3xl absolute top-8 right-10">
+                    <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-3xl absolute top-8 right-10">
                         <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Total Prize Pool</p>
                         <p className="text-2xl font-black text-white tracking-tight">₹{totalCash.toLocaleString('en-IN')}</p>
                     </div>
@@ -3324,7 +3763,7 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
             {prizes.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {prizes.map((prize, idx) => {
-                        const rank = isUmbrella ? { bg: "bg-white/5", text: "text-zinc-500", border: "border-white/5", glow: "" } : (rankColors[idx] ?? { bg: "bg-white/5", text: "text-zinc-500", border: "border-white/5", glow: "" });
+                        const rank = isUmbrella ? { bg: "bg-zinc-900", text: "text-zinc-500", border: "border-zinc-800", glow: "" } : (rankColors[idx] ?? { bg: "bg-zinc-900", text: "text-zinc-500", border: "border-zinc-800", glow: "" });
                         const ico = iconMap[prize.icon] ?? iconMap.trophy;
                         return (
                             <motion.div
@@ -3349,7 +3788,7 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
                                         </div>
                                     )}
                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0">
-                                        <button onClick={() => onEdit(prize)} className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
+                                        <button onClick={() => onEdit(prize)} className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
                                             {readOnly ? <Eye size={15} /> : <Edit3 size={15} />}
                                         </button>
                                         {!readOnly && (
@@ -3382,7 +3821,7 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
                                         {prize.reward || (prize.value ? `₹${Number(prize.value).toLocaleString('en-IN')}` : "—")}
                                     </p>
                                     {isUmbrella && prize.value > 0 && (
-                                        <div className="pt-2 mt-2 border-t border-white/5 flex items-center justify-between">
+                                        <div className="pt-2 mt-2 border-t border-zinc-800 flex items-center justify-between">
                                             <span className="text-[9px] font-black text-zinc-700 uppercase">Estimated Value</span>
                                             <span className="text-xs font-black text-amber-500/60">₹{Number(prize.value).toLocaleString('en-IN')}</span>
                                         </div>
@@ -3400,7 +3839,7 @@ function PrizesTab({ prizes, onAdd, onEdit, onDelete, readOnly, event, updateEve
                     })}
                 </div>
             ) : (
-                <div className="h-80 bg-zinc-950 border-2 border-dashed border-white/5 rounded-[3rem] flex flex-col items-center justify-center gap-6 text-center">
+                <div className="h-80 bg-zinc-950 border-2 border-dashed border-zinc-800 rounded-[3rem] flex flex-col items-center justify-center gap-6 text-center">
                     <div className="w-20 h-20 rounded-[2.5rem] bg-amber-500/5 border border-amber-500/10 flex items-center justify-center text-amber-900">
                         <Trophy size={40} />
                     </div>
@@ -3498,10 +3937,10 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
             <motion.div
                 initial={{ opacity: 0, scale: 0.96, y: 15 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="w-full max-w-lg bg-zinc-950 border border-white/10 rounded-[3rem] shadow-3xl overflow-hidden"
+                className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-[3rem] shadow-3xl overflow-hidden"
             >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-10 pt-10 pb-8 border-b border-white/5 bg-white/[0.01]">
+                <div className="flex items-center justify-between px-10 pt-10 pb-8 border-b border-zinc-800 bg-white/[0.01]">
                     <div>
                         <p className="text-[10px] font-black text-amber-500 uppercase tracking-[0.4em] mb-2">
                             {isPerkMode ? "Event Perk/Giveaway" : "Competition Prize"}
@@ -3512,7 +3951,7 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all shadow-inner"
+                        className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white transition-all shadow-inner"
                     >
                         <X size={20} />
                     </button>
@@ -3533,7 +3972,7 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
                                         "px-4 py-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
                                         (isPerkMode ? formData.category === key : formData.rank === key)
                                             ? "bg-amber-500 text-black border-amber-500 shadow-lg shadow-amber-500/10"
-                                            : "bg-zinc-900/50 border-white/5 text-zinc-500 hover:border-white/10"
+                                            : "bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:border-zinc-800"
                                     )}
                                 >
                                     {label}
@@ -3554,7 +3993,7 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
                                         "flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border transition-all text-[8px] font-black uppercase tracking-widest",
                                         formData.icon === key
                                             ? "bg-amber-500/10 border-amber-500/40 text-amber-500 shadow-lg shadow-amber-500/10 scale-105"
-                                            : "bg-zinc-900/50 border-white/5 text-zinc-600 hover:border-zinc-700"
+                                            : "bg-zinc-900/50 border-zinc-800 text-zinc-600 hover:border-zinc-700"
                                     )}
                                 >
                                     {node}
@@ -3571,7 +4010,7 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
                                 {isPerkMode ? "Perk/Benefit Title" : "Award Title"}
                             </label>
                             <input
-                                className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl px-6 py-5 text-base font-bold text-white focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-700 shadow-inner"
+                                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-6 py-5 text-base font-bold text-white focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-700 shadow-inner"
                                 value={formData.title ?? ""}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 placeholder={isPerkMode ? "e.g. Free Spotify Premium" : "e.g. Winner, Best Solo Artist"}
@@ -3584,7 +4023,7 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
                                 {isPerkMode ? "Benefit Quantity/Details" : "Prize Details"}
                             </label>
                             <textarea
-                                className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl px-6 py-5 text-sm font-medium text-zinc-300 focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-700 min-h-[100px] resize-none shadow-inner"
+                                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-6 py-5 text-sm font-medium text-zinc-300 focus:outline-none focus:border-amber-500/50 transition-all placeholder:text-zinc-700 min-h-[100px] resize-none shadow-inner"
                                 value={formData.reward ?? ""}
                                 onChange={e => setFormData({ ...formData, reward: e.target.value })}
                                 placeholder={isPerkMode ? "e.g. 50 T-shirts for first 50 check-ins" : "e.g. ₹20,000 + Trophy"}
@@ -3601,7 +4040,7 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
                                 <input
                                     type="number"
                                     min={0}
-                                    className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl pl-12 pr-6 py-5 text-base font-black text-white focus:outline-none focus:border-amber-500/50 transition-all shadow-inner"
+                                    className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl pl-12 pr-6 py-5 text-base font-black text-white focus:outline-none focus:border-amber-500/50 transition-all shadow-inner"
                                     value={formData.value ?? 0}
                                     onChange={e => setFormData({ ...formData, value: Number(e.target.value) })}
                                 />
@@ -3615,7 +4054,7 @@ function PrizeModal({ isOpen, onClose, onSave, initialData, saving, readOnly, is
                 <div className="flex gap-4 px-10 pb-10 pt-6 bg-white/[0.01]">
                     <button
                         onClick={onClose}
-                        className="flex-1 h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-zinc-900 text-zinc-500 border border-white/5 hover:text-white hover:bg-zinc-800 transition-all"
+                        className="flex-1 h-14 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-white hover:bg-zinc-800 transition-all"
                     >
                         Dismiss
                     </button>
@@ -3669,7 +4108,7 @@ function SettingsTab({
         <div className="space-y-10 pb-20">
             {/* Checking Conflict Status Message */}
             {checkingConflict && (
-                <div className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/5 rounded-2xl animate-pulse">
+                <div className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse">
                     <Loader2 size={14} className="animate-spin text-cyan-400" />
                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Checking for campus conflicts...</span>
                 </div>
@@ -3677,7 +4116,7 @@ function SettingsTab({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Date & Time Section */}
-                <div className="p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
+                <div className="p-10 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
                     <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
@@ -3699,7 +4138,7 @@ function SettingsTab({
                                     type="datetime-local"
                                     value={toLocalISO(event.start_time)}
                                     onChange={e => updateEvent({ start_time: new Date(e.target.value).toISOString() })}
-                                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/40 transition-all disabled:opacity-50"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/40 transition-all disabled:opacity-50"
                                 />
                             </div>
                         </div>
@@ -3711,7 +4150,7 @@ function SettingsTab({
                                     type="datetime-local"
                                     value={toLocalISO(event.end_time)}
                                     onChange={e => updateEvent({ end_time: new Date(e.target.value).toISOString() })}
-                                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/40 transition-all disabled:opacity-50"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-indigo-500/40 transition-all disabled:opacity-50"
                                 />
                             </div>
                         </div>
@@ -3719,7 +4158,7 @@ function SettingsTab({
                 </div>
 
                 {/* Registration Window Section */}
-                <div className="p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
+                <div className="p-10 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
                     <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
@@ -3741,7 +4180,7 @@ function SettingsTab({
                                     type="datetime-local"
                                     value={toLocalISO(event.reg_start_time)}
                                     onChange={e => updateEvent({ reg_start_time: new Date(e.target.value).toISOString() })}
-                                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-cyan-500/40 transition-all disabled:opacity-50"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-cyan-500/40 transition-all disabled:opacity-50"
                                 />
                             </div>
                         </div>
@@ -3753,7 +4192,7 @@ function SettingsTab({
                                     type="datetime-local"
                                     value={toLocalISO(event.reg_end_time)}
                                     onChange={e => updateEvent({ reg_end_time: new Date(e.target.value).toISOString() })}
-                                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-cyan-500/40 transition-all disabled:opacity-50"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-sm font-bold text-white focus:outline-none focus:border-cyan-500/40 transition-all disabled:opacity-50"
                                 />
                                 <p className="text-[8px] text-zinc-600 font-bold mt-2 italic ml-1 uppercase tracking-widest">Enrollment must end before the event starts.</p>
                             </div>
@@ -3762,7 +4201,7 @@ function SettingsTab({
                 </div>
 
                 {/* Venue Section */}
-                <div className="p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
+                <div className="p-10 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
                     <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
@@ -3783,7 +4222,7 @@ function SettingsTab({
                                 onChange={e => updateEvent({ venue_id: e.target.value === "" ? null : e.target.value })}
                                 className={cn(
                                     "w-full bg-zinc-900 border rounded-2xl px-6 py-5 text-sm font-bold text-white appearance-none focus:outline-none transition-all disabled:opacity-50 pr-12",
-                                    conflictStatus.type === 'HARD' ? "border-rose-500/50" : "border-white/5 focus:border-rose-500/40"
+                                    conflictStatus.type === 'HARD' ? "border-rose-500/50" : "border-zinc-800 focus:border-rose-500/40"
                                 )}
                             >
                                 <option value="">Online / Remote Platform</option>
@@ -3860,7 +4299,7 @@ function SettingsTab({
                 </div>
 
                 {/* Marketplace & Visibility Section */}
-                <div className="p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
+                <div className="p-10 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] space-y-8 shadow-2xl relative overflow-hidden group">
                     <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
@@ -3876,7 +4315,7 @@ function SettingsTab({
                     <div className="space-y-6 relative z-10">
                         <div className={cn(
                             "rounded-2xl border p-6 transition-all",
-                            event.is_public ? "bg-indigo-500/5 border-indigo-500/20" : "bg-zinc-900/40 border-white/5"
+                            event.is_public ? "bg-indigo-500/5 border-indigo-500/20" : "bg-zinc-900/40 border-zinc-800"
                         )}>
                             <div className="flex items-center justify-between gap-4">
                                 <div className="space-y-1">
@@ -3907,62 +4346,45 @@ function SettingsTab({
             </div>
 
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] space-y-6 shadow-2xl">
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3"><IndianRupee size={18} className="text-emerald-500" /> Professional Budget</h3>
-                    <div className="relative group">
-                        <span className="absolute left-8 top-1/2 -translate-y-1/2 text-2xl font-black text-zinc-800 group-focus-within:text-emerald-500 transition-colors">₹</span>
-                        <input
-                            disabled={readOnly}
-                            type="number"
-                            className="w-full bg-zinc-900 border border-white/10 rounded-[2rem] pl-16 pr-8 py-6 text-2xl font-black text-white focus:outline-none focus:border-emerald-500/30 transition-all disabled:opacity-50"
-                            value={event.budget_required}
-                            onChange={e => updateEvent({ budget_required: Number(e.target.value) })}
-                        />
-                    </div>
-                </div>
-                <div className="p-10 bg-zinc-950 border border-white/5 rounded-[2.5rem] space-y-6 shadow-2xl">
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3"><Shield size={18} className="text-amber-400" /> Risk Assessment</h3>
-                    <div className="flex gap-4">
-                        {["low", "medium", "high"].map(lvl => (
-                            <button
-                                key={lvl}
+            {!isStaffStudent && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="p-10 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] space-y-6 shadow-2xl">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3"><IndianRupee size={18} className="text-emerald-500" /> Professional Budget</h3>
+                        <div className="relative group">
+                            <span className="absolute left-8 top-1/2 -translate-y-1/2 text-2xl font-black text-zinc-800 group-focus-within:text-emerald-500 transition-colors">₹</span>
+                            <input
                                 disabled={readOnly}
-                                onClick={() => updateEvent({ risk_level: lvl })}
-                                className={cn(
-                                    "flex-1 py-5 rounded-2xl border text-[10px] font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden",
-                                    event.risk_level === lvl
-                                        ? "bg-amber-400 text-black border-amber-400 shadow-lg shadow-amber-400/20"
-                                        : "bg-zinc-900 border-white/5 text-zinc-600 hover:border-white/10",
-                                    readOnly && "opacity-50 cursor-not-allowed"
-                                )}
-                            >
-                                {lvl}
-                            </button>
-                        ))}
+                                type="number"
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-[2rem] pl-16 pr-8 py-6 text-2xl font-black text-white focus:outline-none focus:border-emerald-500/30 transition-all disabled:opacity-50"
+                                value={event.budget_required}
+                                onChange={e => updateEvent({ budget_required: Number(e.target.value) })}
+                            />
+                        </div>
+                    </div>
+                    <div className="p-10 bg-zinc-950 border border-zinc-800 rounded-[2.5rem] space-y-6 shadow-2xl">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3"><Shield size={18} className="text-amber-400" /> Risk Assessment</h3>
+                        <div className="flex gap-4">
+                            {["low", "medium", "high"].map(lvl => (
+                                <button
+                                    key={lvl}
+                                    disabled={readOnly}
+                                    onClick={() => updateEvent({ risk_level: lvl })}
+                                    className={cn(
+                                        "flex-1 py-5 rounded-2xl border text-[10px] font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden",
+                                        event.risk_level === lvl
+                                            ? "bg-amber-400 text-black border-amber-400 shadow-lg shadow-amber-400/20"
+                                            : "bg-zinc-900 border-zinc-800 text-zinc-600 hover:border-zinc-800",
+                                        readOnly && "opacity-50 cursor-not-allowed"
+                                    )}
+                                >
+                                    {lvl}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Sync Button Container */}
-            <div className="flex items-center justify-between pt-10 border-t border-white/5">
-                <p className="text-[10px] font-medium text-zinc-600 uppercase tracking-widest italic ml-2">
-                    {readOnly ? "Mission parameters are immutable" : "Changes effect student event views immediately"}
-                </p>
-                {!readOnly && (
-                    <button
-                        disabled={saving || conflictStatus.type === 'HARD'}
-                        onClick={onSave}
-                        className={cn(
-                            "h-14 px-12 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-4 transition-all shadow-2xl disabled:opacity-50 active:scale-95",
-                            conflictStatus.type === 'HARD' ? "bg-zinc-900 border border-white/5 text-zinc-600" : "bg-white text-black hover:bg-zinc-200"
-                        )}
-                    >
-                        {saving ? <Loader2 size={16} className="animate-spin" /> : (conflictStatus.type === 'HARD' ? <AlertCircle size={16} /> : <Save size={16} />)}
-                        {conflictStatus.type === 'HARD' ? "Conflict Blocked" : "Save Governance Settings"}
-                    </button>
-                )}
-            </div>
 
             {/* Final Review & HOD Submission Card */}
             {!isStaffStudent && (event.status === "draft" || event.status === "review_pending" || event.status === "revision_required" || event.status === "changes_requested") && (
@@ -4080,7 +4502,7 @@ function FaqsTab({ faqs, onChange, onSave, saving, readOnly }: {
 
             {/* FAQ List */}
             {faqs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 gap-5 border-2 border-dashed border-white/5 rounded-[3rem]">
+                <div className="flex flex-col items-center justify-center py-24 gap-5 border-2 border-dashed border-zinc-800 rounded-[3rem]">
                     <div className="w-16 h-16 rounded-[2rem] bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
                         <HelpCircle size={28} />
                     </div>
@@ -4104,7 +4526,7 @@ function FaqsTab({ faqs, onChange, onSave, saving, readOnly }: {
                                 "rounded-[1.75rem] border overflow-hidden transition-all",
                                 expanded === faq.id
                                     ? "border-violet-500/30 bg-violet-500/5"
-                                    : "border-white/5 bg-zinc-950 hover:border-white/10"
+                                    : "border-zinc-800 bg-zinc-950 hover:border-zinc-800"
                             )}
                         >
                             {/* Accordion Header */}
@@ -4156,7 +4578,7 @@ function FaqsTab({ faqs, onChange, onSave, saving, readOnly }: {
                                             placeholder="e.g. No, participation is completely free for all registered students."
                                             value={faq.answer}
                                             onChange={e => updateFaq(faq.id, "answer", e.target.value)}
-                                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-5 py-4 text-sm text-zinc-300 font-medium leading-relaxed focus:outline-none focus:border-violet-500/30 resize-none placeholder:text-zinc-700 transition-all"
+                                            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4 text-sm text-zinc-300 font-medium leading-relaxed focus:outline-none focus:border-violet-500/30 resize-none placeholder:text-zinc-700 transition-all"
                                         />
                                     </div>
                                 </div>
@@ -4168,7 +4590,7 @@ function FaqsTab({ faqs, onChange, onSave, saving, readOnly }: {
 
             {/* Tips */}
             {faqs.length > 0 && (
-                <div className="p-5 bg-zinc-900/40 rounded-[1.5rem] border border-white/5 flex gap-4">
+                <div className="p-5 bg-zinc-900/40 rounded-[1.5rem] border border-zinc-800 flex gap-4">
                     <div className="w-8 h-8 shrink-0 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400">
                         <Zap size={14} />
                     </div>
@@ -4181,16 +4603,6 @@ function FaqsTab({ faqs, onChange, onSave, saving, readOnly }: {
                 </div>
             )}
 
-            <div className="flex justify-end pt-6 border-t border-white/5">
-                <button
-                    disabled={saving}
-                    onClick={onSave}
-                    className="bg-white text-black h-12 px-10 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-3 hover:bg-zinc-200 transition-all shadow-xl disabled:opacity-50"
-                >
-                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    Save FAQs
-                </button>
-            </div>
         </div>
     );
 }
@@ -4298,7 +4710,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                         ))}
                         <button
                             onClick={() => addSponsor("Custom Partner")}
-                            className="flex items-center gap-2 h-10 px-4 rounded-xl border border-white/10 bg-white/5 text-white text-[9px] font-black uppercase tracking-widest transition-all hover:bg-white/10"
+                            className="flex items-center gap-2 h-10 px-4 rounded-xl border border-zinc-800 bg-zinc-900 text-white text-[9px] font-black uppercase tracking-widest transition-all hover:bg-white/10"
                         >
                             <Plus size={12} /> Custom Ally
                         </button>
@@ -4307,7 +4719,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
             </div>
 
             {mergedSponsors.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-32 gap-6 border-2 border-dashed border-white/5 rounded-[3rem] bg-zinc-950/20">
+                <div className="flex flex-col items-center justify-center py-32 gap-6 border-2 border-dashed border-zinc-800 rounded-[3rem] bg-zinc-950/20">
                     <div className="w-20 h-20 rounded-[2.5rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-2xl shadow-amber-500/10">
                         <Handshake size={32} />
                     </div>
@@ -4322,8 +4734,8 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                         const list = mergedSponsors.filter(s => s.tier === tierName);
                         const tierConfig = STANDARD_TIERS.find(t => t.value === tierName) || {
                             color: "text-zinc-400",
-                            border: "border-white/10",
-                            bg: "bg-white/5"
+                            border: "border-zinc-800",
+                            bg: "bg-zinc-900"
                         };
 
                         return (
@@ -4334,7 +4746,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                                     <h3 className={cn("text-xl font-black uppercase tracking-[0.2em]", tierConfig.color)}>
                                         {tierName}
                                     </h3>
-                                    <div className="flex-1 h-px bg-white/5" />
+                                    <div className="flex-1 h-px bg-zinc-900" />
                                     <span className="text-[9px] text-zinc-700 font-black uppercase tracking-[0.2em] italic">{list.length} Partner{list.length !== 1 ? 's' : ''}</span>
                                 </div>
 
@@ -4359,7 +4771,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                                             <div className="flex gap-6">
                                                 {/* Logo Upload Dropzone */}
                                                 <div className="relative group/logo shrink-0">
-                                                    <div className="w-24 h-24 rounded-3xl bg-zinc-900 border border-white/5 flex items-center justify-center overflow-hidden group-hover:border-white/20 transition-all shadow-inner">
+                                                    <div className="w-24 h-24 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden group-hover:border-white/20 transition-all shadow-inner">
                                                         {uploadingId === sponsor.id ? (
                                                             <div className="flex flex-col items-center gap-2">
                                                                 <Loader2 size={24} className="animate-spin text-amber-500" />
@@ -4401,7 +4813,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                                                     <div className="space-y-4">
                                                         <div className="space-y-2">
                                                             <label className="text-[9px] font-black text-zinc-700 uppercase tracking-widest ml-1">Official Website</label>
-                                                            <div className="flex items-center gap-3 bg-zinc-900/50 rounded-2xl px-4 py-3 border border-white/5 group-hover:border-white/10 transition-all">
+                                                            <div className="flex items-center gap-3 bg-zinc-900/50 rounded-2xl px-4 py-3 border border-zinc-800 group-hover:border-zinc-800 transition-all">
                                                                 <Globe size={14} className="text-zinc-600 shrink-0" />
                                                                 <input
                                                                     type="text"
@@ -4418,7 +4830,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                                             </div>
 
                                             {/* Actions or Attribution */}
-                                            <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                                            <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
                                                 {sponsor.isGlobal ? (
                                                     <div className="flex items-center gap-2">
                                                         <ShieldCheck size={12} className="text-indigo-500" />
@@ -4428,7 +4840,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-center gap-2">
-                                                        <label className="text-[9px] font-black text-zinc-700 uppercase tracking-widest border-r border-white/10 pr-3 mr-1">Change Tier</label>
+                                                        <label className="text-[9px] font-black text-zinc-700 uppercase tracking-widest border-r border-zinc-800 pr-3 mr-1">Change Tier</label>
                                                         <div className="flex flex-wrap gap-2">
                                                             {STANDARD_TIERS.map(t => (
                                                                 <button
@@ -4438,7 +4850,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                                                                         "px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all",
                                                                         sponsor.tier === t.value
                                                                             ? cn(t.color, t.border, t.bg)
-                                                                            : "border-white/5 text-zinc-700 hover:border-white/10 hover:text-zinc-400"
+                                                                            : "border-zinc-800 text-zinc-700 hover:border-zinc-800 hover:text-zinc-400"
                                                                     )}
                                                                 >
                                                                     {t.label}
@@ -4468,7 +4880,7 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
 
             {/* Live Visualization Preview */}
             {mergedSponsors.length > 0 && (
-                <div className="p-8 bg-zinc-900/20 border border-white/5 rounded-[2.5rem] space-y-6">
+                <div className="p-8 bg-zinc-900/20 border border-zinc-800 rounded-[2.5rem] space-y-6">
                     <div className="flex items-center gap-3">
                         <Eye size={14} className="text-zinc-600" />
                         <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] font-mono">Live Visualizer — Public Matrix Preview</p>
@@ -4485,12 +4897,12 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                                     </div>
                                     <div className="flex flex-wrap gap-4">
                                         {list.map(s => (
-                                            <div key={s.id} className="flex flex-col items-center gap-3 bg-zinc-950 border border-white/5 rounded-[1.75rem] p-4 min-w-[124px] group/item hover:border-indigo-500/30 transition-all shadow-xl">
+                                            <div key={s.id} className="flex flex-col items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-[1.75rem] p-4 min-w-[124px] group/item hover:border-indigo-500/30 transition-all shadow-xl">
                                                 <div className="w-12 h-12 flex items-center justify-center relative">
                                                     {s.logo_url ? (
                                                         <img src={s.logo_url} alt={s.name} className="max-h-full max-w-full object-contain grayscale group-hover/item:grayscale-0 transition-all duration-700" />
                                                     ) : (
-                                                        <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-white/5">
+                                                        <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800">
                                                             <Handshake size={14} className="text-zinc-800" />
                                                         </div>
                                                     )}
@@ -4510,18 +4922,6 @@ function SponsorsTab({ sponsors, parentSponsors = [], onChange, onSave, saving, 
                 </div>
             )}
 
-            <div className="flex justify-end pt-8 border-t border-white/5">
-                {!readOnly && (
-                    <button
-                        disabled={saving}
-                        onClick={onSave}
-                        className="bg-white text-black h-14 px-12 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 hover:bg-amber-400 transition-all shadow-2xl disabled:opacity-50 active:scale-95"
-                    >
-                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save Partners Spectrum
-                    </button>
-                )}
-            </div>
         </div>
     );
 }
@@ -4604,13 +5004,13 @@ function SubEventsTab({ parentId, subEvents, festDomains, onRefresh, onDeleteSub
                             <div key={domainName} className="space-y-8">
                                 {/* Domain Level 1 Header */}
                                 <div className="flex items-center gap-6">
-                                    <h3 className="text-[10px] font-black text-white uppercase tracking-[0.5em] px-6 py-2.5 bg-white/5 rounded-full border border-white/10 shrink-0 italic">
+                                    <h3 className="text-[10px] font-black text-white uppercase tracking-[0.5em] px-6 py-2.5 bg-zinc-900 rounded-full border border-zinc-800 shrink-0 italic">
                                         {domainName}
                                     </h3>
                                     <div className="h-[1px] flex-1 bg-gradient-to-r from-white/10 to-transparent" />
                                 </div>
 
-                                <div className="space-y-12 pl-6 md:pl-10 border-l border-white/5 ml-4">
+                                <div className="space-y-12 pl-6 md:pl-10 border-l border-zinc-800 ml-4">
                                     {Object.entries(categories).map(([categoryKey, group]: [string, any]) => (
                                         <div key={categoryKey} className="space-y-8">
                                             {/* Category Level 2 Title (The Row) */}
@@ -4627,7 +5027,7 @@ function SubEventsTab({ parentId, subEvents, festDomains, onRefresh, onDeleteSub
                                                     <div key={ev.id} className="p-6 md:p-8 rounded-[2.5rem] bg-zinc-900/30 border border-white/[0.03] group hover:border-cyan-500/20 hover:bg-zinc-900/50 transition-all duration-500">
                                                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                                                             <div className="flex items-center gap-6">
-                                                                <div className="w-14 h-14 rounded-2xl bg-zinc-950 flex items-center justify-center border border-white/5 text-zinc-600 group-hover:text-cyan-400 transition-all group-hover:scale-110 shadow-inner shrink-0">
+                                                                <div className="w-14 h-14 rounded-2xl bg-zinc-950 flex items-center justify-center border border-zinc-800 text-zinc-600 group-hover:text-cyan-400 transition-all group-hover:scale-110 shadow-inner shrink-0">
                                                                     <Zap size={20} />
                                                                 </div>
                                                                 <div className="space-y-2">
@@ -4637,7 +5037,7 @@ function SubEventsTab({ parentId, subEvents, festDomains, onRefresh, onDeleteSub
                                                                             "px-2.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border shadow-sm",
                                                                             ev.status === 'approved' || ev.status === 'live' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
                                                                                 ev.status === 'pending' ? "bg-amber-500/10 border-amber-500/20 text-amber-400" :
-                                                                                    "bg-white/5 border-white/10 text-zinc-500"
+                                                                                    "bg-zinc-900 border-zinc-800 text-zinc-500"
                                                                         )}>
                                                                             {ev.status}
                                                                         </div>
@@ -4653,7 +5053,7 @@ function SubEventsTab({ parentId, subEvents, festDomains, onRefresh, onDeleteSub
                                                                 <div className="flex items-center gap-2 mr-2">
                                                                     <button
                                                                         onClick={() => handleEditSubEvent(ev)}
-                                                                        className="w-10 h-10 rounded-2xl bg-zinc-950/50 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+                                                                        className="w-10 h-10 rounded-2xl bg-zinc-950/50 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
                                                                         title="Edit Sub-Event"
                                                                     >
                                                                         <Edit3 size={15} />
@@ -4677,7 +5077,7 @@ function SubEventsTab({ parentId, subEvents, festDomains, onRefresh, onDeleteSub
                                                                     </button>
                                                                     <button
                                                                         onClick={() => router.push(`/faculty/event/${ev.id}/manage`)}
-                                                                        className="h-11 px-6 rounded-2xl bg-zinc-900 border border-white/5 text-white hover:bg-white hover:text-black text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95 translate-y-0 hover:-translate-y-1"
+                                                                        className="h-11 px-6 rounded-2xl bg-zinc-900 border border-zinc-800 text-white hover:bg-white hover:text-black text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95 translate-y-0 hover:-translate-y-1"
                                                                     >
                                                                         Manage <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                                                                     </button>
@@ -4694,8 +5094,8 @@ function SubEventsTab({ parentId, subEvents, festDomains, onRefresh, onDeleteSub
                         ))}
                     </div>
                 ) : (
-                    <div className="py-24 text-center space-y-6 bg-zinc-900/20 rounded-[4rem] border border-dashed border-white/5">
-                        <div className="w-20 h-20 rounded-[2.5rem] bg-zinc-900 flex items-center justify-center mx-auto text-zinc-800 border border-white/5 shadow-2xl">
+                    <div className="py-24 text-center space-y-6 bg-zinc-900/20 rounded-[4rem] border border-dashed border-zinc-800">
+                        <div className="w-20 h-20 rounded-[2.5rem] bg-zinc-900 flex items-center justify-center mx-auto text-zinc-800 border border-zinc-800 shadow-2xl">
                             <Layers size={32} />
                         </div>
                         <div className="space-y-2">
@@ -4706,7 +5106,7 @@ function SubEventsTab({ parentId, subEvents, festDomains, onRefresh, onDeleteSub
                         </div>
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="h-10 px-6 rounded-xl bg-white/5 border border-white/5 text-zinc-500 hover:text-white hover:bg-white/10 text-[9px] font-black uppercase tracking-widest transition-all"
+                            className="h-10 px-6 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white hover:bg-white/10 text-[9px] font-black uppercase tracking-widest transition-all"
                         >
                             Create First Activity
                         </button>
@@ -4815,7 +5215,7 @@ function SubEventModal({ isOpen, onClose, parentId, festDomains, onSuccess, init
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="w-full max-w-lg bg-zinc-950 border border-white/10 rounded-[3rem] shadow-3xl overflow-hidden"
+                        className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-[3rem] shadow-3xl overflow-hidden"
                     >
                         <div className="p-10 space-y-8">
                             <div className="flex items-center justify-between">
@@ -4827,7 +5227,7 @@ function SubEventModal({ isOpen, onClose, parentId, festDomains, onSuccess, init
                                         {initialData ? "Modifying Operational Parameters" : "Integrating Activity into Fest Matrix"}
                                     </p>
                                 </div>
-                                <button onClick={onClose} className="p-3 rounded-2xl hover:bg-white/5 text-zinc-600 transition-all">
+                                <button onClick={onClose} className="p-3 rounded-2xl hover:bg-zinc-900 text-zinc-600 transition-all">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -4840,7 +5240,7 @@ function SubEventModal({ isOpen, onClose, parentId, festDomains, onSuccess, init
                                         placeholder="e.g. RoboWars, Capture The Flag"
                                         value={title}
                                         onChange={e => setTitle(e.target.value)}
-                                        className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-cyan-500/40 transition-all placeholder:text-zinc-800"
+                                        className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-cyan-500/40 transition-all placeholder:text-zinc-800"
                                     />
                                 </div>
 
@@ -5123,7 +5523,7 @@ function DomainsTab({ eventId, domains, onRefresh, onDeleteDomain, readOnly }: {
     );
 }
 
-function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTitle }: any) {
+function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTitle, isStaffStudent, currentUserId, isParentHost, parentFestName, showMessage, eventType }: any) {
     const router = useRouter();
     const [facultySearch, setFacultySearch] = useState("");
     const [facultyResults, setFacultyResults] = useState<any[]>([]);
@@ -5135,10 +5535,13 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
     const [editGrant, setEditGrant] = useState(false);
     const [updating, setUpdating] = useState(false);
     const [selectedRoleForNewMember, setSelectedRoleForNewMember] = useState("Volunteer");
+    const [selectedEditAccessForNewMember, setSelectedEditAccessForNewMember] = useState(false);
 
-    const studentRoles = ["Organizer", "Overall Coordinator", "Co-Organizer", "Student Host", "Volunteer", "Lead Volunteer", "Tech Lead", "Creative Lead"];
+    const studentRoles = ["Overall Host", "Lead Organizer", "Organizer", "Co-Organizer", "Student Host", "Marketing Lead", "PR & Outreach", "Logistics Head", "Volunteer", "Lead Volunteer", "Tech Lead", "Creative Lead"];
     
-    const facultyStaff = staff.filter((s: any) => s.student?.role === 'faculty' || s.student?.role === 'hod');
+    const isSubEvent = eventType === 'sub_event';
+    const facultyLeads = staff.filter((s: any) => (s.role_name || s.role) === 'Faculty Lead');
+    const facultyStaff = staff.filter((s: any) => ((s.student?.role === 'faculty' || s.student?.role === 'hod') && (s.role_name || s.role) !== 'Faculty Lead'));
     const studentStaff = staff.filter((s: any) => s.student?.role === 'student');
 
     const handleUserSearch = async (query: string, type: 'faculty' | 'student') => {
@@ -5162,27 +5565,31 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
         }
     };
 
-    const handleAssign = async (user: any, role: string, editAccess: boolean) => {
+    const handleAssign = async (u: any, role: string, editAccess: boolean) => {
         setAssigning(true);
         try {
-            const { error } = await supabase.rpc('assign_event_staff', {
+            // 1. Tactical Deployment via Security Definer RPC
+            const { error } = await supabase.rpc("assign_event_staff", {
                 p_event_id: eventId,
-                p_student_id: user.id,
+                p_student_id: u.id,
                 p_role: role,
                 p_edit_access: editAccess,
-                p_notif_title: editAccess ? "💎 Mission Authorization: Blueprint Editor" : "Authorized Access: Hub Deployment",
-                p_notif_message: editAccess 
-                    ? `You have been authorized as ${role} for tactical deployment: ${eventTitle}. Access the blueprint mission now.`
-                    : `You have been authorized as ${role} for tactical deployment: ${eventTitle}.`
+                p_notif_title: "💎 Mission Assigned",
+                p_notif_message: `Mission Assigned: You are now the ${role} for ${eventTitle}. Check your workspace.`
             });
+            
             if (error) throw error;
+
+            if (showMessage) showMessage(`Personnel successfully deployed as ${role}. 🚀`);
+            
             onRefresh();
             setFacultySearch("");
             setStudentSearch("");
             setFacultyResults([]);
             setStudentResults([]);
         } catch (err: any) {
-            alert(err.message);
+            if (showMessage) showMessage(err.message, "error");
+            else alert(err.message);
         } finally {
             setAssigning(false);
         }
@@ -5192,30 +5599,27 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
         if (!editingStaff) return;
         setUpdating(true);
         try {
-            const { error: updateError } = await supabase.from("event_staff").update({
-                role_name: editRole,
-                role: editRole, // Update legacy column too
-                grant_edit_access: editGrant
-            }).eq("id", editingStaff.id);
-            if (updateError) throw updateError;
-
-            // 2. Automatic Notification
-            await supabase.from("notifications").insert({
-                user_id: editingStaff.student_id,
-                title: "💎 Mission Role Reconfigured",
-                message: editGrant 
-                    ? `You have been granted Event Creation rights for ${eventTitle}. Access the blueprint now.`
-                    : `Your role for ${eventTitle} has been updated to ${editRole}.`,
-                type: editGrant ? "mission" : "info",
-                link: `/faculty/event/${eventId}/manage`
+            // 1. Commit transformation via Atomic RPC (Bypasses RLS & Ensures Persistence)
+            const { error: rpcError } = await supabase.rpc("assign_event_staff", {
+                p_event_id: eventId,
+                p_student_id: editingStaff.student_id,
+                p_role: editRole,
+                p_edit_access: editGrant,
+                p_notif_title: "💎 Mission Role Reconfigured",
+                p_notif_message: `Mission Assigned: You are now the ${editRole} for ${eventTitle}. Check your workspace.`
             });
+
+            if (rpcError) throw rpcError;
+
+            if (showMessage) showMessage("Registry updated. Role transformation complete. 🛠️");
 
             // 3. Instant Refresh
             await onRefresh();
-            router.refresh(); 
+            router.refresh();
             setEditingStaff(null);
         } catch (err: any) {
-            alert(err.message);
+            if (showMessage) showMessage(err.message, "error");
+            else alert(err.message);
         } finally {
             setUpdating(false);
         }
@@ -5223,109 +5627,222 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
 
     return (
         <div className="space-y-20 pb-20">
-            {/* TIER 1: FACULTY LEADERSHIP */}
-            <section className="space-y-8">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter flex items-center gap-4">
-                            Faculty Co-Hosts
-                            <div className="h-1 w-12 bg-indigo-500 rounded-full" />
-                        </h3>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-2">Strategic Oversight & Shared Institutional Control</p>
-                    </div>
-                </div>
-
-                {!readOnly && (
-                    <div className="relative group">
-                        <div className="absolute -inset-0.5 bg-indigo-500/20 rounded-[2.5rem] blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
-                        <div className="relative p-8 rounded-[2.5rem] bg-zinc-950 border border-indigo-500/30 flex flex-col md:flex-row gap-6 items-end">
-                            <div className="flex-1 space-y-2 w-full">
-                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Search Faculty / HOD</label>
-                                <div className="relative">
-                                    <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
-                                    <input
-                                        type="text"
-                                        value={facultySearch}
-                                        onChange={(e) => handleUserSearch(e.target.value, 'faculty')}
-                                        placeholder="Enter name or institutional email..."
-                                        className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl pl-12 pr-6 py-4 text-sm font-bold focus:border-indigo-500/40 outline-none transition-all"
-                                    />
-                                    {facultyResults.length > 0 && (
-                                        <div className="absolute top-full left-0 right-0 mt-3 bg-zinc-950 border border-white/10 rounded-3xl shadow-3xl overflow-hidden z-50">
-                                            {facultyResults.map(u => (
-                                                <button
-                                                    key={u.id}
-                                                    onClick={() => handleAssign(u, "Faculty Host", true)}
-                                                    className="w-full px-6 py-4 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex items-center justify-between group/item"
-                                                >
-                                                    <div>
-                                                        <p className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-3">
-                                                            {u.full_name}
-                                                            <span className="text-[9px] px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-white/5">{u.department?.name || "No Dept"}</span>
-                                                        </p>
-                                                        <p className="text-[10px] text-zinc-500 font-medium">{u.email}</p>
-                                                    </div>
-                                                    <div className="h-8 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest opacity-0 group-hover/item:opacity-100 transition-all flex items-center gap-2">
-                                                        <Plus size={12} /> Add as Host
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="h-14 px-8 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                                <div className="text-center">
-                                    <p className="text-[9px] font-black uppercase tracking-widest">Default Access</p>
-                                    <p className="text-[11px] font-black text-white">EDIT_RIGHTS</p>
-                                </div>
-                            </div>
+            {/* TIER 0: SUB-EVENT FACULTY LEAD */}
+            {isSubEvent && (
+                <section className="space-y-8">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter flex items-center gap-4">
+                                {isSubEvent ? "Sub-Event Faculty Leadership" : "Sub-Event Faculty Lead"}
+                                <div className="h-1 w-12 bg-amber-500 rounded-full" />
+                            </h3>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-2">Institutional Oversight & Shared Mission Control</p>
                         </div>
                     </div>
-                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-                    {facultyStaff.map((s: any) => (
-                        <div key={s.id} className="p-6 rounded-[2rem] bg-zinc-900/30 border border-white/5 flex items-center justify-between group hover:bg-zinc-900/50 transition-all">
-                            <div className="flex items-center gap-5">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs">
-                                    {s.student?.full_name?.charAt(0)}
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-3">
-                                        <p className="text-sm font-black text-white uppercase tracking-tight">{s.student?.full_name}</p>
-                                        <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-zinc-400 uppercase tracking-widest">
-                                            {s.student?.department?.name || 'GEN'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{s.role_name || 'Faculty Host'}</p>
+                    {!readOnly && (isSubEvent || facultyLeads.length === 0) && (
+                        <div className="relative group">
+                            <div className="absolute -inset-0.5 bg-amber-500/20 rounded-[2.5rem] blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                            <div className="relative p-8 rounded-[2.5rem] bg-zinc-950 border border-amber-500/30 flex flex-col md:flex-row gap-6 items-end">
+                                <div className="flex-1 space-y-2 w-full">
+                                    <label className="text-[10px] font-black text-amber-400 uppercase tracking-widest ml-1">Search Faculty Lead</label>
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                        <input
+                                            type="text"
+                                            value={facultySearch}
+                                            onChange={(e) => handleUserSearch(e.target.value, 'faculty')}
+                                            placeholder="Enter name or institutional email..."
+                                            className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl pl-12 pr-6 py-4 text-sm font-bold focus:border-amber-500/40 outline-none transition-all"
+                                        />
+                                        {facultyResults.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 mt-3 bg-zinc-950 border border-white/10 rounded-3xl shadow-3xl overflow-hidden z-50">
+                                                {facultyResults.map(u => (
+                                                    <div
+                                                        key={u.id}
+                                                        className="w-full px-6 py-4 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex items-center justify-between group/item"
+                                                    >
+                                                        <div>
+                                                            <p className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-3">
+                                                                {u.full_name}
+                                                                <span className="text-[9px] px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-white/5">{u.department?.name || "No Dept"}</span>
+                                                            </p>
+                                                            <p className="text-[10px] text-zinc-500 font-medium">{u.email}</p>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button 
+                                                                onClick={() => handleAssign(u, "Faculty Lead", true)}
+                                                                className="h-8 px-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2 hover:bg-amber-500/20"
+                                                            >
+                                                                <Shield size={12} /> Assign Lead
+                                                            </button>
+                                                            {isSubEvent && (
+                                                                <button 
+                                                                    onClick={() => handleAssign(u, "Faculty Host", true)}
+                                                                    className="h-8 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2 hover:bg-indigo-500/20"
+                                                                >
+                                                                    <Plus size={12} /> Add Co-Host
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                            {!readOnly && (
-                                <button
-                                    onClick={async () => {
-                                        if (!confirm("Remove this faculty host?")) return;
-                                        await supabase.from("event_staff").delete().eq("id", s.id);
-                                        onRefresh();
-                                    }}
-                                    className="p-3 rounded-xl hover:bg-rose-500/10 text-zinc-600 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                    <X size={16} />
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                    {facultyStaff.length === 0 && (
-                        <div className="col-span-full py-12 text-center rounded-[2rem] border border-dashed border-white/5 bg-white/[0.01]">
-                            <Users size={20} className="mx-auto text-zinc-800 mb-3" />
-                            <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest italic">No Faculty Co-Hosts Assigned</p>
                         </div>
                     )}
-                </div>
-            </section>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                        {(isSubEvent 
+                            ? staff.filter((s: any) => s.student?.role === 'faculty' || s.student?.role === 'hod') 
+                            : facultyLeads
+                        ).map((s: any) => (
+                            <div key={s.id} className="p-6 rounded-[2rem] bg-amber-500/5 border border-amber-500/10 flex items-center justify-between group hover:bg-amber-500/10 transition-all">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 font-black text-xs">
+                                        {s.student?.full_name?.charAt(0)}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-3">
+                                            <p className="text-sm font-black text-white uppercase tracking-tight">{s.student?.full_name}</p>
+                                            <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-zinc-400 uppercase tracking-widest">
+                                                {s.student?.department?.name || 'GEN'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", (s.role_name || s.role) === 'Faculty Lead' ? "bg-amber-500" : "bg-indigo-500")} />
+                                            <p className={cn("text-[10px] font-black uppercase tracking-widest", (s.role_name || s.role) === 'Faculty Lead' ? "text-amber-400" : "text-indigo-400")}>
+                                                {s.role_name || s.role || 'Faculty Lead'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {!readOnly && (
+                                    <button
+                                        onClick={async () => {
+                                            if (!confirm("Revoke faculty lead assignment?")) return;
+                                            await supabase.from("event_staff").delete().eq("id", s.id);
+                                            onRefresh();
+                                        }}
+                                        className="p-3 rounded-xl hover:bg-rose-500/10 text-zinc-600 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* TIER 1: FACULTY LEADERSHIP */}
+            {!isStaffStudent && !isSubEvent && (
+                <section className="space-y-8">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter flex items-center gap-4">
+                                Faculty Co-Hosts
+                                <div className="h-1 w-12 bg-indigo-500 rounded-full" />
+                            </h3>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-2">Strategic Oversight & Shared Institutional Control</p>
+                        </div>
+                    </div>
+
+                    {!readOnly && (
+                        <div className="relative group">
+                            <div className="absolute -inset-0.5 bg-indigo-500/20 rounded-[2.5rem] blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                            <div className="relative p-8 rounded-[2.5rem] bg-zinc-950 border border-indigo-500/30 flex flex-col md:flex-row gap-6 items-end">
+                                <div className="flex-1 space-y-2 w-full">
+                                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Search Faculty / HOD</label>
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                        <input
+                                            type="text"
+                                            value={facultySearch}
+                                            onChange={(e) => handleUserSearch(e.target.value, 'faculty')}
+                                            placeholder="Enter name or institutional email..."
+                                            className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl pl-12 pr-6 py-4 text-sm font-bold focus:border-indigo-500/40 outline-none transition-all"
+                                        />
+                                        {facultyResults.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 mt-3 bg-zinc-950 border border-white/10 rounded-3xl shadow-3xl overflow-hidden z-50">
+                                                {facultyResults.map(u => (
+                                                    <button
+                                                        key={u.id}
+                                                        onClick={() => handleAssign(u, "Faculty Host", true)}
+                                                        className="w-full px-6 py-4 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex items-center justify-between group/item"
+                                                    >
+                                                        <div>
+                                                            <p className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-3">
+                                                                {u.full_name}
+                                                                <span className="text-[9px] px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-white/5">{u.department?.name || "No Dept"}</span>
+                                                            </p>
+                                                            <p className="text-[10px] text-zinc-500 font-medium">{u.email}</p>
+                                                        </div>
+                                                        <div className="h-8 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest opacity-0 group-hover/item:opacity-100 transition-all flex items-center gap-2">
+                                                            <Plus size={12} /> Add as Host
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="h-14 px-8 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black uppercase tracking-widest">Default Access</p>
+                                        <p className="text-[11px] font-black text-white">EDIT_RIGHTS</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                        {facultyStaff.map((s: any) => (
+                            <div key={s.id} className="p-6 rounded-[2rem] bg-zinc-900/30 border border-white/5 flex items-center justify-between group hover:bg-zinc-900/50 transition-all">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-black text-xs">
+                                        {s.student?.full_name?.charAt(0)}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-3">
+                                            <p className="text-sm font-black text-white uppercase tracking-tight">{s.student?.full_name}</p>
+                                            <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[8px] font-black text-zinc-400 uppercase tracking-widest">
+                                                {s.student?.department?.name || 'GEN'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{s.role_name || 'Faculty Host'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {!readOnly && (
+                                    <button
+                                        onClick={async () => {
+                                            if (!confirm("Remove this faculty host?")) return;
+                                            await supabase.from("event_staff").delete().eq("id", s.id);
+                                            onRefresh();
+                                        }}
+                                        className="p-3 rounded-xl hover:bg-rose-500/10 text-zinc-600 hover:text-rose-500 transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        {facultyStaff.length === 0 && (
+                            <div className="col-span-full py-12 text-center rounded-[2rem] border border-dashed border-white/5 bg-white/[0.01]">
+                                <Users size={20} className="mx-auto text-zinc-800 mb-3" />
+                                <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest italic">No Faculty Co-Hosts Assigned</p>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
 
             {/* TIER 2: STUDENT WORKFORCE */}
             <section className="space-y-8">
@@ -5337,6 +5854,11 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                         </h3>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-2">Task-Force & Operational Execution</p>
                     </div>
+                    {isParentHost && parentFestName && (
+                        <div className="px-4 py-2 rounded-xl bg-cyan-500/5 border border-cyan-500/10 text-cyan-500 text-[8px] font-black uppercase tracking-widest italic animate-pulse">
+                            Managing as Sovereign Proxy for {parentFestName}
+                        </div>
+                    )}
                 </div>
 
                 {!readOnly && (
@@ -5365,20 +5887,47 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                                                     </p>
                                                     <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-widest">{u.email}</p>
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <select 
-                                                        value={selectedRoleForNewMember}
-                                                        onChange={(e) => setSelectedRoleForNewMember(e.target.value)}
-                                                        className="h-9 bg-zinc-900 border border-white/10 rounded-xl px-3 text-[9px] font-black uppercase tracking-widest focus:border-cyan-500 outline-none"
-                                                    >
-                                                        {studentRoles.map(r => <option key={r} value={r}>{r}</option>)}
-                                                    </select>
-                                                    <button
-                                                        onClick={() => { handleAssign(u, selectedRoleForNewMember, false); setStudentResults([]); setStudentSearch(""); }}
-                                                        className="h-9 px-4 rounded-xl bg-cyan-500 text-black text-[9px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all flex items-center gap-2"
-                                                    >
-                                                        <Plus size={12} /> Deploy
-                                                    </button>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex flex-col gap-1 items-end">
+                                                        <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mr-1">Authority Level</label>
+                                                        <select 
+                                                            value={selectedRoleForNewMember}
+                                                            onChange={(e) => setSelectedRoleForNewMember(e.target.value)}
+                                                            className="h-9 bg-zinc-900 border border-white/10 rounded-xl px-3 text-[9px] font-black uppercase tracking-widest focus:border-cyan-500 outline-none text-white appearance-none min-w-[140px]"
+                                                        >
+                                                            {studentRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1 items-center">
+                                                        <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Edit</label>
+                                                        <button 
+                                                            onClick={() => setSelectedEditAccessForNewMember(!selectedEditAccessForNewMember)}
+                                                            className={cn(
+                                                                "h-9 w-9 rounded-xl border flex items-center justify-center transition-all",
+                                                                selectedEditAccessForNewMember 
+                                                                    ? "bg-emerald-500 border-emerald-500 text-black shadow-lg shadow-emerald-500/20" 
+                                                                    : "bg-zinc-900 border-white/10 text-zinc-600 hover:text-white"
+                                                            )}
+                                                            title={selectedEditAccessForNewMember ? "Granting Edit Authority" : "View Only"}
+                                                        >
+                                                            {selectedEditAccessForNewMember ? <ShieldCheck size={14} /> : <Shield size={14} />}
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1 pt-4">
+                                                        <button
+                                                            onClick={() => { 
+                                                                handleAssign(u, selectedRoleForNewMember, selectedEditAccessForNewMember); 
+                                                                setStudentResults([]); 
+                                                                setStudentSearch(""); 
+                                                            }}
+                                                            className="h-12 px-6 rounded-xl bg-white text-black text-[9px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all flex items-center gap-2 shadow-xl shadow-cyan-500/10"
+                                                        >
+                                                            {assigning ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                                                            Deploy
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -5420,7 +5969,7 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                             </div>
 
                             <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-all">
-                                {!readOnly && (
+                                {!readOnly && s.student_id !== currentUserId && s.student?.id !== currentUserId && (!isStaffStudent || s.student?.role === 'student') && (
                                     <>
                                         <button 
                                             onClick={() => { 
@@ -5434,7 +5983,7 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                                             <Edit3 size={16} />
                                         </button>
                                         <button 
-                                            onClick={async () => { if(confirm("Revoke student assignment?")) { await supabase.from("event_staff").delete().eq("id", s.id); onRefresh(); } }}
+                                            onClick={async () => { if(confirm("Revoke member assignment?")) { await supabase.from("event_staff").delete().match({ event_id: eventId, student_id: s.student_id }); onRefresh(); router.refresh(); } }}
                                             className="w-11 h-11 rounded-2xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-rose-500 transition-all"
                                         >
                                             <Trash2 size={16} />
@@ -5481,7 +6030,9 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                                         >
                                             {editingStaff.student?.role === 'student' 
                                                 ? studentRoles.map(r => <option key={r} value={r}>{r}</option>)
-                                                : <option value="Faculty Host">Faculty Host</option>
+                                                : isSubEvent 
+                                                    ? <><option value="Faculty Lead">Faculty Lead</option><option value="Faculty Host">Faculty Host</option></>
+                                                    : <option value="Faculty Host">Faculty Host</option>
                                             }
                                         </select>
                                     </div>

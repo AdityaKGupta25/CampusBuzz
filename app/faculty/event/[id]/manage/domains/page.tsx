@@ -48,7 +48,7 @@ export default function DomainsAndVerticalsPage() {
             const [eventRes, domainsRes] = await Promise.all([
                 supabase
                     .from("events")
-                    .select("title, event_type")
+                    .select("title, event_type, event_subtype")
                     .eq("id", eventId)
                     .eq("institution_id", institutionId)
                     .single(),
@@ -166,7 +166,7 @@ export default function DomainsAndVerticalsPage() {
                 <div className="text-center space-y-4">
                     <AlertCircle size={48} className="text-rose-500 mx-auto" />
                     <h2 className="text-2xl font-black uppercase tracking-tighter">Access Restricted</h2>
-                    <p className="text-zinc-500 text-sm">Domains are only available for Umbrella Events (Mega Fests) in your institution.</p>
+                    <p className="text-zinc-500 text-sm">Domains are only available for Umbrella Events (Mega Fests or Hubs) in your institution.</p>
                     <button onClick={() => router.back()} className="text-indigo-400 font-bold hover:underline">Go Back</button>
                 </div>
             </div>
@@ -263,7 +263,7 @@ export default function DomainsAndVerticalsPage() {
                                             {editingDomain ? "Update Domain" : "Add Domain"}
                                         </h2>
                                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                                            {editingDomain ? "Modifying operational category" : "Categorize your Mega Fest"}
+                                            {editingDomain ? "Modifying operational category" : "Categorize your Infrastructure"}
                                         </p>
                                     </div>
                                     <button onClick={() => { setIsModalOpen(false); setEditingDomain(null); }} className="p-2 rounded-xl hover:bg-white/5 text-zinc-500">
