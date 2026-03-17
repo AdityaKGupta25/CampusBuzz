@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, exportToCSV } from "@/lib/utils";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ec4899', '#8b5cf6'];
 
 interface ReportsTabProps {
     event: any;
@@ -44,18 +47,42 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
             depts[deptName] = (depts[deptName] || 0) + 1;
         });
 
-        if (Object.keys(depts).length === 0 || (Object.keys(depts).length === 1 && Object.keys(depts)[0] === "Other")) {
-            return [
-                { name: "Computer Science", count: Math.floor(totalRegs * 0.45) },
-                { name: "Information Tech", count: Math.floor(totalRegs * 0.25) },
-                { name: "Electronics", count: Math.floor(totalRegs * 0.15) },
-                { name: "Mechanical", count: Math.floor(totalRegs * 0.10) },
-                { name: "Civil", count: Math.floor(totalRegs * 0.05) },
-            ];
-        }
+        return Object.entries(depts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+    }, [registrations]);
 
-        return Object.entries(depts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
-    }, [registrations, totalRegs]);
+    // 3. Karma Points Calculation
+    const totalKarma = useMemo(() => {
+        let karma = 0;
+        registrations.forEach(r => {
+            if (r.status === "attended") karma += 10;
+        });
+        submissions.forEach(s => {
+            if (s.status === "graded") karma += 20;
+        });
+        prizes.forEach(p => {
+            if (p.winner_id || p.winner_team_id) karma += 50;
+        });
+        return karma;
+    }, [registrations, submissions, prizes]);
+
+    // Registration vs Attendance Chart Data
+    const attendanceData = useMemo(() => {
+        if (isUmbrella) {
+            return subEvents?.map(s => ({
+                name: s.title?.substring(0, 15) + (s.title?.length > 15 ? '...' : ''),
+                Registered: registrations.filter((r: any) => r.event_id === s.id).length,
+                Attended: registrations.filter((r: any) => r.event_id === s.id && r.status === "attended").length
+            })) || [];
+        } else {
+            return [{
+                name: "This Event",
+                Registered: totalRegs,
+                Attended: totalAttended
+            }];
+        }
+    }, [isUmbrella, subEvents, registrations, totalRegs, totalAttended]);
 
     const maxDeptCount = Math.max(...deptData.map(d => d.count), 1);
 
@@ -148,7 +175,7 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                 {[
                     { label: "Institutional Reach", value: totalRegs, icon: <Users className="text-white" />, tagline: "Total Registrations", color: "bg-white", textColor: "text-black" },
                     { label: "Operational Success", value: `${conversionRate.toFixed(1)}%`, icon: <CheckCircle2 className="text-emerald-400" />, tagline: "Attendance Efficiency", color: "bg-zinc-950", textColor: "text-white" },
-                    { label: "Engagement Score", value: `${((totalSubmissions / (totalRegs || 1)) * 100).toFixed(1)}%`, icon: <Zap className="text-amber-400" />, tagline: "Active Participation", color: "bg-zinc-950", textColor: "text-white" },
+                    { label: "Karma Points Dist.", value: totalKarma, icon: <Zap className="text-amber-400" />, tagline: "Total Campus Karma", color: "bg-zinc-950", textColor: "text-white" },
                     { label: "Department Diversity", value: deptData.length, icon: <BarChart3 className="text-indigo-400" />, tagline: "Branches Involved", color: "bg-zinc-950", textColor: "text-white" },
                 ].map((kpi, i) => (
                     <motion.div
@@ -255,57 +282,66 @@ export function ReportsTab({ event, registrations = [], submissions = [], prizes
                 </section>
             )}
 
-            {/* ── Participation Heatmap ── */}
-            <div className="px-4">
-                <div className="p-16 bg-zinc-950 border border-white/5 shadow-2xl space-y-16 group relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-max h-full p-20 opacity-[0.02] -rotate-12 pointer-events-none select-none italic text-9xl font-black text-white whitespace-nowrap">
-                        DEPARTMENT DIVERSITY HEATMAP • DEPARTMENT DIVERSITY HEATMAP
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-4">
+                {/* ── Registration vs Attendance Bar Chart ── */}
+                <div className="p-10 bg-zinc-950 border border-white/5 shadow-2xl relative overflow-hidden flex flex-col">
+                    <div className="flex items-center gap-4 mb-8 relative z-10">
+                        <span className="h-px w-10 bg-indigo-500" />
+                        <h4 className="text-[11px] font-black uppercase tracking-[0.6em] text-zinc-500 italic">Participation Funnel</h4>
+                    </div>
+                    <div className="flex-1 min-h-[300px] w-full mt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={attendanceData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                <XAxis dataKey="name" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                                <Tooltip
+                                    cursor={{ fill: '#ffffff05' }}
+                                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#ffffff10', borderRadius: '16px', fontSize: '12px' }}
+                                    itemStyle={{ fontWeight: 900, textTransform: 'uppercase' }}
+                                />
+                                <Bar dataKey="Registered" fill="#3f3f46" radius={[4, 4, 0, 0]} barSize={30} />
+                                <Bar dataKey="Attended" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={30} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* ── Departmental Donut Chart ── */}
+                <div className="p-10 bg-zinc-950 border border-white/5 shadow-2xl relative overflow-hidden flex flex-col">
+                    <div className="flex items-center gap-4 mb-2 relative z-10">
+                        <span className="h-px w-10 bg-emerald-500" />
+                        <h4 className="text-[11px] font-black uppercase tracking-[0.6em] text-zinc-500 italic">Department Diversity</h4>
                     </div>
                     
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 relative z-10 border-b border-white/10 pb-12">
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <span className="h-px w-10 bg-indigo-500" />
-                                <h4 className="text-[11px] font-black uppercase tracking-[0.6em] text-zinc-500 italic">Participant Heatmap</h4>
-                            </div>
-                            <h3 className="text-5xl font-black text-white uppercase italic tracking-tighter">Strategic Branch Domain Dominance</h3>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1 italic">Highest Active Volume</p>
-                            <h5 className="text-3xl font-black text-indigo-400 italic uppercase truncate">
-                                {deptData[0]?.name || "N/A"}
-                            </h5>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-10 relative z-10">
-                        {deptData.slice(0, 5).map((dept, i) => (
-                            <div key={dept.name} className="space-y-4 group/heat min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-6">
-                                        <span className="text-xs font-black text-zinc-700 italic">0{i+1}</span>
-                                        <span className="text-lg font-black text-white uppercase tracking-tight group-hover/heat:text-indigo-400 transition-colors truncate max-w-[200px] md:max-w-none">{dept.name}</span>
-                                    </div>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-black text-white italic transition-all group-hover/heat:scale-110">{dept.count}</span>
-                                        <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Registrations</span>
-                                    </div>
-                                </div>
-                                <div className="h-12 bg-white/5 p-1.5 relative overflow-hidden group-hover/heat:bg-white/10 transition-colors">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${(dept.count / maxDeptCount) * 100}%` }}
-                                        transition={{ duration: 2, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
-                                        className={cn(
-                                            "h-full relative",
-                                            i === 0 ? "bg-white" : "bg-indigo-600"
-                                        )}
+                    <div className="flex-1 min-h-[300px] w-full flex items-center justify-center mt-4">
+                        {deptData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={deptData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={80}
+                                        outerRadius={100}
+                                        paddingAngle={5}
+                                        dataKey="count"
+                                        stroke="none"
                                     >
-                                        {i === 0 && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/10 to-transparent" />}
-                                    </motion.div>
-                                </div>
+                                        {deptData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#09090b', borderColor: '#ffffff10', borderRadius: '16px', fontSize: '12px' }}
+                                        itemStyle={{ fontWeight: 900, textTransform: 'uppercase' }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="text-zinc-500 text-[10px] font-black uppercase tracking-widest text-center">
+                                No department data available
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
             </div>
