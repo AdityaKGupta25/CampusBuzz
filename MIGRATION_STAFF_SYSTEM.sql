@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     type        TEXT        NOT NULL DEFAULT 'info', -- info, success, warning, alert
     is_read     BOOLEAN     NOT NULL DEFAULT FALSE,
     link        TEXT,       -- optional action link
+    related_event_id UUID   REFERENCES events(id) ON DELETE CASCADE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -90,6 +91,24 @@ DROP POLICY IF EXISTS "notifications_select_own" ON notifications;
 CREATE POLICY "notifications_select_own"
     ON notifications FOR SELECT
     USING (user_id = current_user_id());
+
+DROP POLICY IF EXISTS "notifications_insert_staff" ON notifications;
+CREATE POLICY "notifications_insert_staff"
+    ON notifications FOR INSERT
+    WITH CHECK (current_user_role() IN ('faculty', 'admin', 'hod'));
+
+DROP POLICY IF EXISTS "notifications_select_staff" ON notifications;
+CREATE POLICY "notifications_select_staff"
+    ON notifications FOR SELECT
+    USING (
+        user_id = current_user_id()
+        OR current_user_role() IN ('admin', 'hod')
+        OR EXISTS (
+            SELECT 1 FROM event_staff es
+            WHERE es.event_id = notifications.related_event_id
+            AND es.student_id = current_user_id()
+        )
+    );
 
 DROP POLICY IF EXISTS "notifications_update_own" ON notifications;
 CREATE POLICY "notifications_update_own"

@@ -304,7 +304,7 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
     // ── Phase Scope Locking ──
     const strictlyPlanningTabs = ['overview', 'organizers', 'domains', 'sub-events', 'rounds', 'registration', 'prizes', 'faqs', 'sponsors'];
     const executionTabs = ['submissions', 'broadcast', 'scanner'];
-    
+
     // Check if the current tab belongs to a phase that is already over
     const isTabPastScope = (activeTab !== 'settings') && (
         (isExecution && strictlyPlanningTabs.includes(activeTab) && !(event?.is_umbrella && (activeTab === 'sub-events' || activeTab === 'domains'))) ||
@@ -397,16 +397,16 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                 // Phase 4: State updates
                 const currentUserId = (user as any)?.dbId || (user as any)?.id;
                 const relevantStaff = staffRes.data || [];
-                
+
                 const isStudent = user?.role === 'student';
                 const isCreator = (eventData.creator_id === currentUserId);
 
                 // Permission Check: Check both current event and parent event
-                let userStaffRecords = (relevantStaff || []).filter(s => 
-                    s.student_id === currentUserId || 
+                let userStaffRecords = (relevantStaff || []).filter(s =>
+                    s.student_id === currentUserId ||
                     s.student?.id === currentUserId
                 );
-                
+
                 let hasEditPermission = userStaffRecords.some(s => s.grant_edit_access);
                 let isParentAuthorized = userStaffRecords.some(s => s.event_id === eventData.parent_event_id && s.grant_edit_access);
 
@@ -423,7 +423,7 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                         isParentAuthorized = myStaffRecords.some(r => r.event_id === eventData.parent_event_id && r.grant_edit_access);
                     }
                 }
-                
+
                 // Security Verification: If a student tries to access, ensure they have delegate credentials
                 // Logic: Access IF in staff table AND can_edit_event is true (or they are the creator)
                 if (isStudent && !isCreator && !hasEditPermission) {
@@ -1203,10 +1203,10 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                 .from("submissions")
                 .update({ score, feedback, status: "graded" })
                 .eq("id", id);
-            
+
             if (error) throw error;
-            
-            setSubmissions(prev => prev.map(s => 
+
+            setSubmissions(prev => prev.map(s =>
                 s.id === id ? { ...s, score, feedback, status: "graded" as const } : s
             ));
             showMessage("Evaluation score published successfully. 🎯");
@@ -1220,18 +1220,18 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
 
     const handleAssignWinner = async (prizeId: string, winnerId: string | null, type: "individual" | "team") => {
         try {
-            const updateProps = type === "individual" 
+            const updateProps = type === "individual"
                 ? { winner_id: winnerId, winner_team_id: null }
                 : { winner_team_id: winnerId, winner_id: null };
-                
+
             const { error } = await supabase
                 .from("event_prizes")
                 .update(updateProps)
                 .eq("id", prizeId);
-                
+
             if (error) throw error;
-            
-            setPrizes(prev => prev.map(p => 
+
+            setPrizes(prev => prev.map(p =>
                 p.id === prizeId ? { ...p, ...updateProps } : p
             ));
             showMessage("Winner assigned successfully. 🏆");
@@ -1250,16 +1250,16 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                 .from("events")
                 .update({ status: "completed" })
                 .eq("id", event.id);
-                
+
             if (updateError) throw updateError;
-            
+
             // 2. Insert into verified_ledger for all registrants/participants
             // For individuals
             const individualRegistrations = registrations.filter(r => !r.team_id && r.student);
             const teamRegistrations = registrations.filter(r => r.team_id && r.team);
-            
+
             const ledgerEntries = [];
-            
+
             for (const p of prizes) {
                 if (p.winner_id) {
                     ledgerEntries.push({
@@ -1277,7 +1277,7 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                     // We'll trust RPC or further triggers, but insert basic team info.
                     ledgerEntries.push({
                         event_id: event.id,
-                        student_id: teamRegistrations.find(r => r.team_id === p.winner_team_id)?.student_id || user.dbId, 
+                        student_id: teamRegistrations.find(r => r.team_id === p.winner_team_id)?.student_id || user.dbId,
                         institution_id: user.institution_id,
                         certificate_type: "winner",
                         certificate_hash: `WINNER-TEAM-${event.id}-${p.winner_team_id}-${Date.now()}`,
@@ -1285,7 +1285,7 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                     });
                 }
             }
-            
+
             for (const ind of individualRegistrations) {
                 // If not already in ledgerEntries as winner
                 if (!ledgerEntries.find(l => l.student_id === ind.student_id && l.certificate_type === "winner")) {
@@ -1299,12 +1299,12 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                     });
                 }
             }
-            
+
             if (ledgerEntries.length > 0) {
                 const { error: ledgerError } = await supabase
                     .from("verified_ledger")
                     .insert(ledgerEntries);
-                    
+
                 if (ledgerError) console.error("Ledger constraint skip:", ledgerError);
             }
 
@@ -1411,10 +1411,10 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                             <h2 className="text-[11px] font-black text-white tracking-tight uppercase line-clamp-2 leading-tight italic opacity-90">{event.title}</h2>
                             <div className="flex items-center">
                                 {event.event_type === 'umbrella' && (
-                                    <Badge 
-                                        icon={<Zap size={10} />} 
-                                        label={event.event_subtype === 'fest' ? "Mega Fest" : "Activity Hub"} 
-                                        variant="amber" 
+                                    <Badge
+                                        icon={<Zap size={10} />}
+                                        label={event.event_subtype === 'fest' ? "Mega Fest" : "Activity Hub"}
+                                        variant="amber"
                                     />
                                 )}
                                 {event.event_type === 'sub_event' && <Badge icon={<Layers size={10} />} label="Sub-Event" variant="cyan" />}
@@ -1445,7 +1445,7 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                                             title="Stage 1: Strategic Planning"
                                             isOpen={openSection === "planning"}
                                             onToggle={() => setOpenSection(openSection === "planning" ? null : "planning")}
-                                            isLocked={false} 
+                                            isLocked={false}
                                             isCompleted={isExecution || isOutcome}
                                             isActive={isPlanning}
                                             badge={(isExecution || isOutcome) ? "LOCKED" : undefined}
@@ -1785,12 +1785,12 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                         </div>
 
                         <div className="flex items-center gap-6">
-                                <button
-                                    onClick={() => setShowPreview(true)}
-                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-11 px-6 rounded-2xl transition-all border border-zinc-800 hover:bg-white/10 hover:border-zinc-800 backdrop-blur-md"
-                                >
-                                    <Eye size={15} /> Preview
-                                </button>
+                            <button
+                                onClick={() => setShowPreview(true)}
+                                className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest h-11 px-6 rounded-2xl transition-all border border-zinc-800 hover:bg-white/10 hover:border-zinc-800 backdrop-blur-md"
+                            >
+                                <Eye size={15} /> Preview
+                            </button>
 
                             <button
                                 disabled={saving || isEffectiveReadOnly || conflictStatus.type === 'HARD'}
@@ -1838,12 +1838,12 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                         </div>
 
                         <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => setShowPreview(true)}
-                                    className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest h-10 px-4 rounded-xl transition-all border border-zinc-800 hover:bg-zinc-900"
-                                >
-                                    <Eye size={16} /> Preview
-                                </button>
+                            <button
+                                onClick={() => setShowPreview(true)}
+                                className="text-zinc-400 hover:text-white flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest h-10 px-4 rounded-xl transition-all border border-zinc-800 hover:bg-zinc-900"
+                            >
+                                <Eye size={16} /> Preview
+                            </button>
                             <button
                                 disabled={saving || isEffectiveReadOnly || conflictStatus.type === 'HARD'}
                                 onClick={handleSaveAll}
@@ -2059,11 +2059,11 @@ export function EventManageDashboardInner({ propEventId, onClose }: { propEventI
                                             <h3 className="text-xl font-bold text-white">Institutional Scanner</h3>
                                             <p className="text-sm text-zinc-500 max-w-md mx-auto mt-1">Verify student identities and check-in attendees at the venue using secure QR protocols.</p>
                                         </div>
-                                        <button 
-                                            onClick={() => router.push(`/faculty/scanner?eventId=${eventId}`)}
+                                        <button
+                                            onClick={() => router.push(`/faculty/scan?eventId=${eventId}`)}
                                             className="px-6 py-2 rounded-xl bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all"
                                         >
-                                            Launch Scanner Interface
+                                            Launch Venue Scanner
                                         </button>
                                     </div>
                                 )}
@@ -2306,22 +2306,22 @@ export default function EventManageDashboard() {
 
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
-function AccordionSection({ 
-    title, 
-    isOpen, 
-    onToggle, 
-    isLocked, 
-    isCompleted, 
-    isActive, 
-    children, 
-    badge 
-}: { 
-    title: string; 
-    isOpen: boolean; 
-    onToggle: () => void; 
-    isLocked: boolean; 
-    isCompleted: boolean; 
-    isActive: boolean; 
+function AccordionSection({
+    title,
+    isOpen,
+    onToggle,
+    isLocked,
+    isCompleted,
+    isActive,
+    children,
+    badge
+}: {
+    title: string;
+    isOpen: boolean;
+    onToggle: () => void;
+    isLocked: boolean;
+    isCompleted: boolean;
+    isActive: boolean;
     children: React.ReactNode;
     badge?: string;
 }) {
@@ -2340,12 +2340,12 @@ function AccordionSection({
                     <div className={cn(
                         "w-4 h-4 rounded-full flex items-center justify-center border transition-all shrink-0",
                         isCompleted ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                        isActive ? "bg-white border-white text-black shadow-[0_0_12px_rgba(255,255,255,0.3)]" :
-                        isLocked ? "bg-zinc-950 border-zinc-900 text-zinc-800" : "bg-zinc-900 border-zinc-800 text-zinc-600"
+                            isActive ? "bg-white border-white text-black shadow-[0_0_12px_rgba(255,255,255,0.3)]" :
+                                isLocked ? "bg-zinc-950 border-zinc-900 text-zinc-800" : "bg-zinc-900 border-zinc-800 text-zinc-600"
                     )}>
-                        {isCompleted ? <Check size={8} strokeWidth={4} /> : 
-                         isLocked ? <Lock size={8} /> : 
-                         <div className={cn("w-1 h-1 rounded-full", isActive ? "bg-black" : "bg-zinc-700")} />}
+                        {isCompleted ? <Check size={8} strokeWidth={4} /> :
+                            isLocked ? <Lock size={8} /> :
+                                <div className={cn("w-1 h-1 rounded-full", isActive ? "bg-black" : "bg-zinc-700")} />}
                     </div>
                     <div className="text-left flex flex-col items-start gap-0.5">
                         {stage && (
@@ -2369,13 +2369,13 @@ function AccordionSection({
                     </div>
                 </div>
                 {!isLocked && (
-                    <ChevronDown 
-                        size={12} 
-                        className={cn("text-zinc-700 transition-transform duration-300", isOpen ? "rotate-180" : "")} 
+                    <ChevronDown
+                        size={12}
+                        className={cn("text-zinc-700 transition-transform duration-300", isOpen ? "rotate-180" : "")}
                     />
                 )}
             </button>
-            
+
             <AnimatePresence initial={false}>
                 {isOpen && !isLocked && (
                     <motion.div
@@ -3580,7 +3580,7 @@ function RegistrationTab({
                                                 <Trash2 size={12} />
                                             </button>
                                         </div>
-                                        
+
                                         <div className="space-y-3">
                                             <input
                                                 className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-[11px] font-bold text-white focus:outline-none focus:border-indigo-500/50 transition-all"
@@ -3619,7 +3619,7 @@ function RegistrationTab({
                                     <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">No tracks configured yet.</p>
                                 </div>
                             )}
-                            
+
                             <button
                                 onClick={() => {
                                     updateEvent({
@@ -5589,7 +5589,7 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
     const [selectedEditAccessForNewMember, setSelectedEditAccessForNewMember] = useState(false);
 
     const studentRoles = ["Overall Host", "Lead Organizer", "Organizer", "Co-Organizer", "Student Host", "Marketing Lead", "PR & Outreach", "Logistics Head", "Volunteer", "Lead Volunteer", "Tech Lead", "Creative Lead"];
-    
+
     const isSubEvent = eventType === 'sub_event';
     const facultyLeads = staff.filter((s: any) => (s.role_name || s.role) === 'Faculty Lead');
     const facultyStaff = staff.filter((s: any) => ((s.student?.role === 'faculty' || s.student?.role === 'hod') && (s.role_name || s.role) !== 'Faculty Lead'));
@@ -5609,7 +5609,7 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
             .eq('institution_id', institutionId)
             .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
             .limit(5);
-            
+
         if (!error && data) {
             if (type === 'faculty') setFacultyResults(data); else setStudentResults(data);
             if (type === 'student') setSelectedRoleForNewMember("Volunteer");
@@ -5628,11 +5628,11 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                 p_notif_title: "💎 Mission Assigned",
                 p_notif_message: `Mission Assigned: You are now the ${role} for ${eventTitle}. Check your workspace.`
             });
-            
+
             if (error) throw error;
 
             if (showMessage) showMessage(`Personnel successfully deployed as ${role}. 🚀`);
-            
+
             onRefresh();
             setFacultySearch("");
             setStudentSearch("");
@@ -5721,14 +5721,14 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                                                             <p className="text-[10px] text-zinc-500 font-medium">{u.email}</p>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleAssign(u, "Faculty Lead", true)}
                                                                 className="h-8 px-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2 hover:bg-amber-500/20"
                                                             >
                                                                 <Shield size={12} /> Assign Lead
                                                             </button>
                                                             {isSubEvent && (
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handleAssign(u, "Faculty Host", true)}
                                                                     className="h-8 px-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2 hover:bg-indigo-500/20"
                                                                 >
@@ -5747,8 +5747,8 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-                        {(isSubEvent 
-                            ? staff.filter((s: any) => s.student?.role === 'faculty' || s.student?.role === 'hod') 
+                        {(isSubEvent
+                            ? staff.filter((s: any) => s.student?.role === 'faculty' || s.student?.role === 'hod')
                             : facultyLeads
                         ).map((s: any) => (
                             <div key={s.id} className="p-6 rounded-[2rem] bg-amber-500/5 border border-amber-500/10 flex items-center justify-between group hover:bg-amber-500/10 transition-all">
@@ -5941,7 +5941,7 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                                                 <div className="flex items-center gap-4">
                                                     <div className="flex flex-col gap-1 items-end">
                                                         <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mr-1">Authority Level</label>
-                                                        <select 
+                                                        <select
                                                             value={selectedRoleForNewMember}
                                                             onChange={(e) => setSelectedRoleForNewMember(e.target.value)}
                                                             className="h-9 bg-zinc-900 border border-white/10 rounded-xl px-3 text-[9px] font-black uppercase tracking-widest focus:border-cyan-500 outline-none text-white appearance-none min-w-[140px]"
@@ -5952,12 +5952,12 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
 
                                                     <div className="flex flex-col gap-1 items-center">
                                                         <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Edit</label>
-                                                        <button 
+                                                        <button
                                                             onClick={() => setSelectedEditAccessForNewMember(!selectedEditAccessForNewMember)}
                                                             className={cn(
                                                                 "h-9 w-9 rounded-xl border flex items-center justify-center transition-all",
-                                                                selectedEditAccessForNewMember 
-                                                                    ? "bg-emerald-500 border-emerald-500 text-black shadow-lg shadow-emerald-500/20" 
+                                                                selectedEditAccessForNewMember
+                                                                    ? "bg-emerald-500 border-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                                                                     : "bg-zinc-900 border-white/10 text-zinc-600 hover:text-white"
                                                             )}
                                                             title={selectedEditAccessForNewMember ? "Granting Edit Authority" : "View Only"}
@@ -5968,10 +5968,10 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
 
                                                     <div className="flex flex-col gap-1 pt-4">
                                                         <button
-                                                            onClick={() => { 
-                                                                handleAssign(u, selectedRoleForNewMember, selectedEditAccessForNewMember); 
-                                                                setStudentResults([]); 
-                                                                setStudentSearch(""); 
+                                                            onClick={() => {
+                                                                handleAssign(u, selectedRoleForNewMember, selectedEditAccessForNewMember);
+                                                                setStudentResults([]);
+                                                                setStudentSearch("");
                                                             }}
                                                             className="h-12 px-6 rounded-xl bg-white text-black text-[9px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all flex items-center gap-2 shadow-xl shadow-cyan-500/10"
                                                         >
@@ -6022,19 +6022,19 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                             <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-all">
                                 {!readOnly && s.student_id !== currentUserId && s.student?.id !== currentUserId && (!isStaffStudent || s.student?.role === 'student') && (
                                     <>
-                                        <button 
-                                            onClick={() => { 
-                                                setEditingStaff(s); 
+                                        <button
+                                            onClick={() => {
+                                                setEditingStaff(s);
                                                 const initialRole = s.role_name || s.role || "Volunteer";
-                                                setEditRole(initialRole); 
-                                                setEditGrant(!!s.grant_edit_access); 
+                                                setEditRole(initialRole);
+                                                setEditGrant(!!s.grant_edit_access);
                                             }}
                                             className="w-11 h-11 rounded-2xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-cyan-400 transition-all"
                                         >
                                             <Edit3 size={16} />
                                         </button>
-                                        <button 
-                                            onClick={async () => { if(confirm("Revoke member assignment?")) { await supabase.from("event_staff").delete().match({ event_id: eventId, student_id: s.student_id }); onRefresh(); router.refresh(); } }}
+                                        <button
+                                            onClick={async () => { if (confirm("Revoke member assignment?")) { await supabase.from("event_staff").delete().match({ event_id: eventId, student_id: s.student_id }); onRefresh(); router.refresh(); } }}
                                             className="w-11 h-11 rounded-2xl bg-zinc-950 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-rose-500 transition-all"
                                         >
                                             <Trash2 size={16} />
@@ -6059,10 +6059,10 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
             <AnimatePresence>
                 {editingStaff && (
                     <div className="fixed inset-0 z-[350] flex items-center justify-center p-6 backdrop-blur-3xl bg-black/80">
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-                            animate={{ opacity: 1, scale: 1, y: 0 }} 
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }} 
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className="w-full max-w-md bg-[#09090b] border border-white/10 rounded-[3rem] shadow-3xl overflow-hidden shadow-cyan-500/10"
                         >
                             <div className="p-12 space-y-10">
@@ -6074,14 +6074,14 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
                                 <div className="space-y-6">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Assigned Operational Role</label>
-                                        <select 
-                                            value={editRole} 
-                                            onChange={(e) => setEditRole(e.target.value)} 
+                                        <select
+                                            value={editRole}
+                                            onChange={(e) => setEditRole(e.target.value)}
                                             className="w-full h-14 bg-zinc-900 border border-white/5 rounded-2xl px-6 text-[11px] font-black uppercase tracking-widest focus:border-cyan-500/40 outline-none transition-all appearance-none"
                                         >
-                                            {editingStaff.student?.role === 'student' 
+                                            {editingStaff.student?.role === 'student'
                                                 ? studentRoles.map(r => <option key={r} value={r}>{r}</option>)
-                                                : isSubEvent 
+                                                : isSubEvent
                                                     ? <><option value="Faculty Lead">Faculty Lead</option><option value="Faculty Host">Faculty Host</option></>
                                                     : <option value="Faculty Host">Faculty Host</option>
                                             }
@@ -6105,9 +6105,9 @@ function StaffTab({ eventId, staff, onRefresh, readOnly, institutionId, eventTit
 
                                 <div className="flex gap-4">
                                     <button onClick={() => setEditingStaff(null)} className="flex-1 h-14 bg-zinc-950 border border-white/5 rounded-2xl text-[10px] font-black uppercase text-zinc-600 hover:text-white transition-all">Cancel</button>
-                                    <button 
-                                        onClick={handleUpdateStaff} 
-                                        disabled={updating} 
+                                    <button
+                                        onClick={handleUpdateStaff}
+                                        disabled={updating}
                                         className="flex-[2] h-14 bg-white rounded-2xl text-[10px] font-black uppercase text-black shadow-2xl hover:bg-cyan-400 transition-all active:scale-95"
                                     >
                                         {updating ? <Loader2 size={18} className="animate-spin mx-auto text-black" /> : "Commit Transformation"}
