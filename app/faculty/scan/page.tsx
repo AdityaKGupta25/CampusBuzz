@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     CheckCircle2,
@@ -86,7 +86,7 @@ function playAudio(type: "success" | "error") {
 async function verifyRegistration(
     registrationId: string,
     lockEventId: string | null,
-    institutionId: string | undefined
+    institutionId?: string | null
 ): Promise<{ outcome: "success" | "duplicate" | "denied" | "error"; data?: any; reason?: string }> {
     try {
         // Step 1: Fetch Registration
@@ -262,6 +262,18 @@ function ScannerView({ onScan }: { onScan: (code: string) => void }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FacultyScanPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                <Loader2 size={32} className="animate-spin text-indigo-500" />
+            </div>
+        }>
+            <ScanContent />
+        </Suspense>
+    );
+}
+
+function ScanContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useUser();
